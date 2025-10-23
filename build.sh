@@ -7,7 +7,7 @@ mkdir -p $DST_DIR
 cd $DST_DIR
 
 # 配置
-cmake ..
+cmake -DCMAKE_TOOLCHAIN_FILE=/workspace/toolchain.cmake ..
 
 # 编译
 make -j$(nproc)

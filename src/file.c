@@ -21,3 +21,20 @@ int save_data(const char *path, void *data, size_t size)
     printf("图像已保存到: %s (大小: %zu 字节)\n", path, size);
     return 0;
 }
+
+int save_data_nv12(const char *path, void *data_y, size_t size_y, void *data_uv, size_t size_uv)
+{
+    FILE *fp = fopen(path, "wb");
+    if (!fp)
+    {
+        perror("无法创建文件");
+        return -1;
+    }
+
+    fwrite(data_y, 1, size_y, fp);
+    fwrite(data_uv, 1, size_uv, fp);
+
+    fclose(fp);
+    printf("图像已保存到: %s\n", path);
+    return 0;
+}

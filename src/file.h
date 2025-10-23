@@ -13,4 +13,6 @@
  */
 int save_data(const char *path, void *data, size_t size);
 
+int save_data_nv12(const char *path, void *data_y, size_t size_y, void *data_uv, size_t size_uv);
+
 #endif
