@@ -26,7 +26,7 @@ static int fd = -1;
 static struct buffer *buffers = NULL;
 static unsigned int n_buffers = 0;
 
-int init_v4l2(const char *path)
+int init_v4l2(const char *path, int width, int height)
 {
     struct v4l2_capability cap;
 
@@ -63,11 +63,7 @@ int init_v4l2(const char *path)
     printf("驱动: %s\n", cap.driver);
     printf("总线信息: %s\n", cap.bus_info);
 
-    return fd;
-}
-
-int setup_v4l2(int width, int height)
-{
+    // setup start
     struct v4l2_format fmt;
 
     memset(&fmt, 0, sizeof(fmt));
@@ -90,11 +86,9 @@ int setup_v4l2(int width, int height)
         return -1;
     }
 
-    return 0;
-}
+    // setup end
 
-int init_v4l2_mmap(void)
-{
+    // init mmap start
     struct v4l2_requestbuffers req;
 
     memset(&req, 0, sizeof(req));
@@ -161,8 +155,9 @@ int init_v4l2_mmap(void)
             }
         }
     }
+    // init mmap end
 
-    return 0;
+    return fd;
 }
 
 int start_v4l2_capture(void)

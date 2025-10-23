@@ -14,6 +14,8 @@
 static volatile int keep_running = 1;
 
 static const char *VIDEO_PATH = "/dev/video0";
+static const int VIDEO_WIDTH = 1920;
+static const int VIDEO_HEIGHT = 1920;
 static const char *OUTPUT_PATH = "/tmp/capture";
 
 void main_stop()
@@ -33,23 +35,14 @@ int main()
     signal(SIGTERM, main_stop);
 
     // v4l2
-    if (init_v4l2(VIDEO_PATH) < 0)
+    if (init_v4l2(VIDEO_PATH, VIDEO_WIDTH, VIDEO_HEIGHT) < 0)
     {
-        return 1;
-    }
-    if (setup_v4l2(1920, 1080) < 0)
-    {
-        return 2;
-    }
-
-    if (init_v4l2_mmap() < 0)
-    {
-        return 3;
+        return -1;
     }
 
     if (start_v4l2_capture() < 0)
     {
-        return 4;
+        return -2;
     }
 
     while (keep_running)

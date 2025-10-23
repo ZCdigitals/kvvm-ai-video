@@ -12,25 +12,11 @@ extern "C"
      * @brief 初始化V4L2设备
      *
      * @param path 设备路径，如 `/dev/video0`
-     * @return int 成功返回文件描述符，失败返回-1
-     */
-    int init_v4l2(const char *path);
-
-    /**
-     * @brief 设置V4L2设备参数
-     *
      * @param width 图像宽度
      * @param height 图像高度
-     * @return int 成功返回0，失败返回-1
+     * @return int 成功返回文件描述符，失败返回-1
      */
-    int setup_v4l2(int width, int height);
-
-    /**
-     * @brief 初始化V4L2内存映射
-     *
-     * @return int 成功返回0，失败返回-1
-     */
-    int init_v4l2_mmap(void);
+    int init_v4l2(const char *path, int width, int height);
 
     /**
      * @brief 开始视频采集
