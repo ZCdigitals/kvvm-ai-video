@@ -1,4 +1,3 @@
-#include "video.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,19 +7,8 @@
 #include <sys/mman.h>
 #include <linux/videodev2.h>
 
-#define BUFFER_COUNT 4
-
-struct buffer_plane
-{
-    void *start;
-    size_t length;
-};
-
-struct buffer
-{
-    struct buffer_plane planes[VIDEO_MAX_PLANES];
-    int n_planes;
-};
+#include "buffer.h"
+#include "video.h"
 
 static int fd = -1;
 static struct buffer *buffers = NULL;

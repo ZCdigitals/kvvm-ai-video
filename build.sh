@@ -14,10 +14,10 @@ make -j$(nproc)
 
 # 显示构建结果
 echo "Build completed!"
-echo "Binary: $(pwd)/video"
+# echo "Binary: $(pwd)/video"
 
 # 检查文件类型
-file video
+# file video
 
 # 显示文件大小
-size video
+# size video

@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "rk_mpi.h": "c",
+        "rk_mpi_venc.h": "c",
+        "rk_type.h": "c",
+        "rk_mpi_mb.h": "c",
+        "rk_mpi_mmz.h": "c",
+        "random": "c",
+        "rk_common.h": "c",
+        "stdlib.h": "c",
+        "videodev2.h": "c",
+        "buffer.h": "c",
+        "rk_mpi_sys.h": "c"
+    }
+}
