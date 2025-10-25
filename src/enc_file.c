@@ -18,6 +18,8 @@
 
 #define VENC_CHANNEL 0
 
+// read `media/rockit/rockit/mpi/example/mod/test_mpi_venc.cpp`
+
 int success(const char *msg)
 {
     fprintf(stdout, msg);
