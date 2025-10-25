@@ -43,7 +43,15 @@ int32_t read_image_nv12(void *vir_addr, uint32_t width, uint32_t height, uint32_
         size = fread(buffer_y + row * vir_width, 1, width, f);
         if (size != width)
         {
-            fprintf(stderr, "read file error %d %d", width, size);
+            return RK_FAILURE;
+        }
+    }
+
+    for (row = 0; row < vir_height / 2; row++)
+    {
+        size = fread(buffer_u + row * vir_width, 1, width, f);
+        if (size != width)
+        {
             return RK_FAILURE;
         }
     }
