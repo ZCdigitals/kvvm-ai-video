@@ -12,7 +12,7 @@ Please compile in docker.
 
 ```bash
 # build in container
-docker run -it --rm -v .:/app builder:kvvm /app/build.sh
+docker run -it --rm -v .:/app builder:luckfox-pico /app/build.sh
 ```
 
 ## Files

@@ -6,6 +6,8 @@
 #include "rk_mpi_venc.h"
 #include "rk_mpi_mb.h"
 #include "rk_mpi_mmz.h"
+#include "rk_mpi_sys.h"
+#include "rk_mpi_cal.h"
 
 #define INPUT_PATH "/root/frame.raw"
 #define OUPUT_PATH "/root/frame.h264"
@@ -15,6 +17,11 @@
 #define FRAME_HEIGHT 1080
 
 #define VENC_CHANNEL 0
+
+int success(const char *msg)
+{
+    fprintf(stdout, msg);
+}
 
 int error(int32_t ret, const char *__restrict__ __format)
 {
@@ -53,6 +60,7 @@ int main()
     {
         return error(ret, "mpi init error %x\n");
     }
+    success("mpi init ok\n");
 
     VENC_CHN_ATTR_S venc_attr;
     memset(&venc_attr, 0, sizeof(VENC_CHN_ATTR_S));
@@ -76,6 +84,7 @@ int main()
     pic_buf_attr.enPixelFormat = RK_VIDEO_FMT_YUV;
     ret = RK_MPI_CAL_COMM_GetPicBufferSize(&pic_buf_attr, &mb_pic_cal);
     venc_attr.stVencAttr.u32BufSize = mb_pic_cal.u32MBSize;
+    success("calculate video size ok\n");
 
     // set h264 struct props
     venc_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264CBR;
@@ -87,6 +96,7 @@ int main()
     {
         return error(ret, "venc channel create error %x\n");
     }
+    success("venc cannel create ok\n");
 
     // init memory pool
     MB_POOL_CONFIG_S memory_pool_config;
@@ -102,6 +112,18 @@ int main()
     {
         return error(RK_FAILURE, "memory pool create error");
     }
+    success("memory pool create ok\n");
+
+    // start recive frame
+    VENC_RECV_PIC_PARAM_S receive_param;
+    memset(&receive_param, 0, sizeof(VENC_RECV_PIC_PARAM_S));
+    receive_param.s32RecvPicNum = -1;
+    ret = RK_MPI_VENC_StartRecvFrame(VENC_CHANNEL, &receive_param);
+    if (ret != RK_SUCCESS)
+    {
+        return error(ret, "start receive frame error %x\n");
+    }
+    success("start receive frame ok\n");
 
     // use memory
     MB_BLK block = RK_MPI_MB_GetMB(memory_pool, venc_attr.stVencAttr.u32BufSize, RK_TRUE);
@@ -109,6 +131,7 @@ int main()
     {
         return error(RK_FAILURE, "get memory block error");
     }
+    success("get memory block ok\n");
 
     void *vir_addr = RK_MPI_MB_Handle2VirAddr(block);
 
@@ -120,8 +143,14 @@ int main()
     {
         return error(ret, "read image error %x\n");
     }
+    success("read image ok\n");
 
-    RK_MPI_SYS_MmzFlushCache(block, RK_FALSE);
+    ret = RK_MPI_SYS_MmzFlushCache(block, RK_FALSE);
+    if (ret != RK_SUCCESS)
+    {
+        return error(ret, "memory flush cache error %x\n");
+    }
+    success("memory flush cache ok\n");
 
     VIDEO_FRAME_INFO_S frame;
     memset(&frame, 0, sizeof(VIDEO_FRAME_INFO_S));
@@ -135,6 +164,11 @@ int main()
 
     // send frame
     ret = RK_MPI_VENC_SendFrame(VENC_CHANNEL, &frame, -1);
+    if (ret != RK_SUCCESS)
+    {
+        return error(ret, "send frame error %x\n");
+    }
+    success("send frame ok\n");
 
     // write
     FILE *d = fopen(OUPUT_PATH, "wb");
@@ -152,9 +186,11 @@ int main()
         {
             return error(ret, "get stream error %x\n");
         }
+        success("get stream ok\n");
 
         // read data
         data = RK_MPI_MB_Handle2VirAddr(stream.pstPack->pMbBlk);
+        success("handle 2 vir ok\n");
 
         // write to file
         fwrite(data, 1, stream.pstPack->u32Len, d);
@@ -165,6 +201,7 @@ int main()
         {
             return error(ret, "release stream error %x\n");
         }
+        success("release stream ok\n");
 
         if (stream.pstPack->bStreamEnd == RK_TRUE)
         {
@@ -186,6 +223,35 @@ int main()
     {
         return error(ret, "release block error %x\n");
     }
+    success("release block ok\n");
+
+    ret = RK_MPI_VENC_StopRecvFrame(VENC_CHANNEL);
+    if (ret != RK_SUCCESS)
+    {
+        return error(ret, "stop receive frame error %x\n");
+    }
+    success("stop receive frame ok\n");
+
+    ret = RK_MPI_MB_DestroyPool(memory_pool);
+    if (ret != RK_SUCCESS)
+    {
+        return error(ret, "destory memory pool error %x\n");
+    }
+    success("destory memory pool ok\n");
+
+    ret = RK_MPI_VENC_DestroyChn(VENC_CHANNEL);
+    if (ret != RK_SUCCESS)
+    {
+        return error(ret, "destory channel error %x\n");
+    }
+    success("destory channel ok\n");
+
+    ret = RK_MPI_SYS_Exit();
+    if (ret != RK_SUCCESS)
+    {
+        return error(ret, "exit error %x\n");
+    }
+    success("exit channel ok\n");
 
     return ret;
 }
