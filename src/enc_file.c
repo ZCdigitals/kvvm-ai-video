@@ -227,7 +227,6 @@ int main()
     fclose(d);
 
     // relase
-    RK_MPI_MB_ReleaseMB(block);
     ret = RK_MPI_MB_ReleaseMB(block);
     if (ret != RK_SUCCESS)
     {
