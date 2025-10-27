@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <stdint.h>
 
 #include "rk_mpi_venc.h"
 #include "rk_mpi_mb.h"

@@ -10,6 +10,13 @@
         "stdlib.h": "c",
         "videodev2.h": "c",
         "buffer.h": "c",
-        "rk_mpi_sys.h": "c"
+        "rk_mpi_sys.h": "c",
+        "math.h": "c",
+        "cdefs.h": "c",
+        "time.h": "c",
+        "ioctl.h": "c",
+        "stdio.h": "c",
+        "fcntl.h": "c",
+        "unistd.h": "c"
     }
 }

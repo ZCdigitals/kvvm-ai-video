@@ -7,16 +7,16 @@
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
 
+#include "socket.h"
 #include "video.h"
-#include "file.h"
+
+#define VIDEO_PATH "/dev/video0"
+#define VIDEO_WIDTH 1920
+#define VIDEO_HEIGHT 1080
+#define OUTPUT_PATH "/tmp/capture"
 
 // 全局标志位，用于控制主循环
 static volatile int keep_running = 1;
-
-static const char *VIDEO_PATH = "/dev/video0";
-static const int VIDEO_WIDTH = 1920;
-static const int VIDEO_HEIGHT = 1920;
-static const char *OUTPUT_PATH = "/tmp/capture";
 
 void main_stop()
 {
@@ -34,12 +34,18 @@ int main()
     signal(SIGINT, main_stop);
     signal(SIGTERM, main_stop);
 
-    // v4l2
+    // init
     if (init_v4l2(VIDEO_PATH, VIDEO_WIDTH, VIDEO_HEIGHT) < 0)
     {
         return -1;
     }
+    if (init_socket(OUTPUT_PATH) < 0)
+    {
+        close_socket();
+        return -1;
+    }
 
+    // start
     if (start_v4l2_capture() < 0)
     {
         return -2;
@@ -50,19 +56,18 @@ int main()
         int buffer_index = capture_v4l2_frame(&frame_data_y, &frame_size_y, &frame_data_uv, &frame_size_uv);
         if (buffer_index >= 0)
         {
-            if (save_data_nv12(OUTPUT_PATH, frame_data_y, frame_size_y, frame_data_uv, frame_size_uv) == 0)
-            {
-                printf("成功捕获");
-            }
+            send_socket(VIDEO_WIDTH, VIDEO_HEIGHT, frame_data_y, frame_size_y);
         }
 
         usleep(100000);
 
-        main_stop();
+        // main_stop();
     }
 
+    // stop
     stop_v4l2_capture();
 
+    // end
     close_v4l2();
 
     return 0;
