@@ -1,6 +1,8 @@
 #ifndef RK_VENC_H
 #define RK_VENC_H
 
+#include <stdbool.h>
+
 /**
  * init venc
  *
