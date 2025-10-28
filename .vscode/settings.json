@@ -9,7 +9,6 @@
         "rk_common.h": "c",
         "stdlib.h": "c",
         "videodev2.h": "c",
-        "buffer.h": "c",
         "rk_mpi_sys.h": "c",
         "math.h": "c",
         "cdefs.h": "c",
