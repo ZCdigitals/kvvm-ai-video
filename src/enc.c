@@ -138,10 +138,10 @@ void *use_venc_frame()
 int send_venc_frame(unsigned int width, unsigned int height, bool is_end)
 {
     // check block
-    if (block != RK_NULL)
+    if (block == RK_NULL)
     {
         errno = -1;
-        perror("no valid block available, call send_venc_raw_pointer first");
+        perror("no valid block available, call use_venc_frame first");
         return -1;
     }
 
