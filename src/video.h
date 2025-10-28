@@ -31,6 +31,8 @@ int start_v4l2_capture(void);
  */
 int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_data_uv, size_t *frame_size_uv);
 
+int capture_v4l2_frame_single_buffer(void *dst);
+
 /**
  * stop v4l2 caputre
  *

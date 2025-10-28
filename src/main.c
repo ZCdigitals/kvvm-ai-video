@@ -24,7 +24,53 @@ void main_stop()
 
 void *input(void *)
 {
-    int fd = use_venc_frame_fd();
+    void *dst = use_venc_frame();
+    if (dst == NULL)
+    {
+        errno = -1;
+        perror("null destnation");
+        return NULL;
+    }
+
+    int ret = capture_v4l2_frame_single_buffer(dst);
+    if (ret == -1)
+    {
+        return NULL;
+    }
+
+    ret = send_venc_frame(VIDEO_WIDTH, VIDEO_WIDTH, !keep_running);
+    if (ret == -1)
+    {
+        return NULL;
+    }
+
+    return NULL;
+}
+
+void *output(void *)
+{
+    void *frame;
+    unsigned int size;
+
+    int ret = read_venc_frame(&frame, &size);
+    if (ret == -1)
+    {
+        return NULL;
+    }
+
+    ret = send_frame(VIDEO_WIDTH, VIDEO_WIDTH, frame, size);
+    if (ret == -1)
+    {
+        return NULL;
+    }
+
+    ret = release_venc_frame();
+    if (ret == -1)
+    {
+        return NULL;
+    }
+
+    return NULL;
 }
 
 int init()

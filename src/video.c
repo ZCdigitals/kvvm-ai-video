@@ -223,6 +223,28 @@ int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_d
     return buf.index;
 }
 
+int capture_v4l2_frame_single_buffer(void *dst)
+{
+    void *frame_data_y;
+    size_t frame_size_y;
+    void *frame_data_uv;
+    size_t frame_size_uv;
+
+    int ret = capture_v4l2_frame(&frame_data_y, &frame_size_y, &frame_data_uv, &frame_size_uv);
+    if (ret == -1)
+    {
+        return -1;
+    }
+
+    // todo, maybe could be zero copy
+    // for now, multiple planes must copy memory
+
+    memcpy(dst, frame_data_y, frame_size_y);
+    memcpy((char *)dst + frame_size_y, frame_data_uv, frame_size_uv);
+
+    return 0;
+}
+
 int stop_v4l2_capture()
 {
     enum v4l2_buf_type type;
