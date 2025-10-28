@@ -7,8 +7,8 @@
 #include <sys/time.h>
 #include <sys/un.h>
 
-static int fd = -1;
-static int32_t frame_id = 0;
+static volatile int fd = -1;
+static volatile int32_t frame_id = 0;
 
 typedef struct
 {

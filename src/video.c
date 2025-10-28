@@ -23,9 +23,9 @@ struct buffer
     int n_planes;
 };
 
-static int fd = -1;
-static struct buffer *buffers = NULL;
-static unsigned int n_buffers = 0;
+static volatile int fd = -1;
+static volatile struct buffer *buffers = NULL;
+static volatile unsigned int n_buffers = 0;
 
 int init_v4l2(const char *path, int width, int height)
 {

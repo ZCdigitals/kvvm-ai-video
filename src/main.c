@@ -1,3 +1,5 @@
+#include <signal.h>
+
 #define VIDEO_PATH "/dev/video0"
 #define VIDEO_WIDTH 1920
 #define VIDEO_HEIGHT 1080
@@ -13,5 +15,13 @@ void main_stop()
 
 int main()
 {
+    // regist signal
+    signal(SIGINT, main_stop);
+    signal(SIGTERM, main_stop);
+
+    while (keep_running){
+        
+    }
+
     return 0;
 }

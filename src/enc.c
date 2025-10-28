@@ -16,10 +16,10 @@
 
 #define VENC_CHANNEL 0
 
-static uint32_t memory_pool = MB_INVALID_POOLID;
-static uint32_t block_size;
-static MB_BLK block = RK_NULL;
-static VENC_STREAM_S stream;
+static volatile uint32_t memory_pool = MB_INVALID_POOLID;
+static volatile uint32_t block_size;
+static volatile MB_BLK block = RK_NULL;
+static volatile VENC_STREAM_S stream;
 
 int init_venc(unsigned int bit_rate, unsigned int gop, unsigned int width, unsigned int height)
 {
