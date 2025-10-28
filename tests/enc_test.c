@@ -10,8 +10,8 @@
 #include "rk_mpi_sys.h"
 #include "rk_mpi_cal.h"
 
-#define INPUT_PATH "/root/frame.raw"
-#define OUPUT_PATH "/root/frame.h264"
+#define INPUT_PATH "data/frame.raw"
+#define OUPUT_PATH "data/frame.h264"
 
 #define FRAME_COUNT 1
 #define FRAME_WIDTH 1920

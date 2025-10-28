@@ -19,37 +19,33 @@ int init_v4l2(const char *path, int width, int height)
     struct v4l2_capability cap;
 
     fd = open(path, O_RDWR);
-    if (fd < 0)
+    if (fd == -1)
     {
-        perror("Open video device error");
+        perror("video device open error");
         return -1;
     }
 
-    // 检查设备能力
-    if (ioctl(fd, VIDIOC_QUERYCAP, &cap) < 0)
+    // check device capabilities
+    if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == -1)
     {
-        perror("查询设备能力失败");
-        close_v4l2();
+        perror("video device query capabilities error");
+        close(fd);
         return -1;
     }
 
     if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE_MPLANE))
     {
-        fprintf(stderr, "设备不支持多平面视频采集: %x\n", cap.capabilities);
-        close_v4l2();
+        perror("video device not support multi plane");
+        close(fd);
         return -1;
     }
 
     if (!(cap.capabilities & V4L2_CAP_STREAMING))
     {
-        fprintf(stderr, "设备不支持流式IO\n");
-        close_v4l2();
+        perror("video device not support streaming");
+        close(fd);
         return -1;
     }
-
-    printf("设备: %s\n", cap.card);
-    printf("驱动: %s\n", cap.driver);
-    printf("总线信息: %s\n", cap.bus_info);
 
     // setup start
     struct v4l2_format fmt;
@@ -67,13 +63,12 @@ int init_v4l2(const char *path, int width, int height)
     fmt.fmt.pix_mp.plane_fmt[1].bytesperline = width;
     fmt.fmt.pix_mp.plane_fmt[1].sizeimage = width * height / 2;
 
-    if (ioctl(fd, VIDIOC_S_FMT, &fmt) < 0)
+    if (ioctl(fd, VIDIOC_S_FMT, &fmt) == -1)
     {
-        perror("设置格式失败");
-        close_v4l2();
+        perror("video device set format error");
+        close(fd);
         return -1;
     }
-
     // setup end
 
     // init mmap start
@@ -84,17 +79,17 @@ int init_v4l2(const char *path, int width, int height)
     req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
     req.memory = V4L2_MEMORY_MMAP;
 
-    if (ioctl(fd, VIDIOC_REQBUFS, &req) < 0)
+    if (ioctl(fd, VIDIOC_REQBUFS, &req) == -1)
     {
-        perror("申请缓冲区失败");
-        close_v4l2();
+        perror("video device request buffer error");
+        close(fd);
         return -1;
     }
 
     if (req.count < 2)
     {
-        fprintf(stderr, "缓冲区数量不足\n");
-        close_v4l2();
+        perror("video device buffer count not enough");
+        close(fd);
         return -1;
     }
 
@@ -102,8 +97,8 @@ int init_v4l2(const char *path, int width, int height)
     buffers = calloc(req.count, sizeof(*buffers));
     if (!buffers)
     {
-        perror("分配缓冲区内存失败");
-        close_v4l2();
+        perror("video device calloc buffers error");
+        close(fd);
         return -1;
     }
 
@@ -120,10 +115,10 @@ int init_v4l2(const char *path, int width, int height)
         buf.length = VIDEO_MAX_PLANES;
         buf.m.planes = planes;
 
-        if (ioctl(fd, VIDIOC_QUERYBUF, &buf) < 0)
+        if (ioctl(fd, VIDIOC_QUERYBUF, &buf) == -1)
         {
-            perror("查询缓冲区失败");
-            close_v4l2();
+            perror("video device query buffer error");
+            close(fd);
             return -1;
         }
 
@@ -137,15 +132,15 @@ int init_v4l2(const char *path, int width, int height)
                                               fd, buf.m.planes[j].m.mem_offset);
             if (MAP_FAILED == buffers[i].planes[j].start)
             {
-                perror("设置平面缓冲区失败");
-                close_v4l2();
+                perror("video device set plane buffer error");
+                close(fd);
                 return -1;
             }
         }
     }
     // init mmap end
 
-    return fd;
+    return 0;
 }
 
 int start_v4l2_capture(void)
@@ -164,26 +159,25 @@ int start_v4l2_capture(void)
         buf.length = buffers[i].n_planes;
         buf.m.planes = planes;
 
-        if (ioctl(fd, VIDIOC_QBUF, &buf) < 0)
+        if (ioctl(fd, VIDIOC_QBUF, &buf) == -1)
         {
-            perror("队列缓冲区失败");
-            close_v4l2();
+            perror("video device query buffer error");
             return -1;
         }
     }
 
     enum v4l2_buf_type type;
     type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-    if (ioctl(fd, VIDIOC_STREAMON, &type) < 0)
+    if (ioctl(fd, VIDIOC_STREAMON, &type) == -1)
     {
-        perror("启动流失败");
+        perror("video device start streaming error");
         return -1;
     }
 
     return 0;
 }
 
-int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_data_uv, size_t *frame_size_uv)
+unsigned int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_data_uv, size_t *frame_size_uv)
 {
     struct v4l2_buffer buf;
     struct v4l2_plane planes[VIDEO_MAX_PLANES];
@@ -195,10 +189,10 @@ int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_d
     buf.length = VIDEO_MAX_PLANES;
     buf.m.planes = planes;
 
-    if (ioctl(fd, VIDIOC_DQBUF, &buf) < 0)
+    if (ioctl(fd, VIDIOC_DQBUF, &buf) == -1)
     {
-        perror("出队缓冲区失败");
-        return -1;
+        perror("video device dequeue buffer error");
+        return NULL;
     }
 
     *frame_data_y = buffers[buf.index].planes[0].start;
@@ -206,25 +200,31 @@ int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_d
     *frame_data_uv = buffers[buf.index].planes[1].start;
     *frame_size_uv = buffers[buf.index].planes[1].length;
 
-    // 将处理后的缓冲区重新加入队列
-    if (ioctl(fd, VIDIOC_QBUF, &buf) < 0)
+    // add to queue after processing
+    if (ioctl(fd, VIDIOC_QBUF, &buf) == -1)
     {
-        perror("重新队列缓冲区失败");
-        return -1;
+        perror("video device requeue buffer error");
+        return NULL;
     }
 
     return buf.index;
 }
 
-void stop_v4l2_capture(void)
+int stop_v4l2_capture()
 {
     enum v4l2_buf_type type;
 
     type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-    ioctl(fd, VIDIOC_STREAMOFF, &type);
+    if (ioctl(fd, VIDIOC_STREAMOFF, &type) == -1)
+    {
+        perror("video device stop stream error");
+        return -1;
+    }
+
+    return 0;
 }
 
-void close_v4l2(void)
+void close_v4l2()
 {
     if (buffers)
     {

@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,11 +7,32 @@
 #include <sys/time.h>
 #include <sys/un.h>
 
-#include "frame.h"
-#include "time.h"
-
 static int fd = -1;
 static int32_t frame_id = 0;
+
+typedef struct
+{
+    uint32_t id;
+    uint32_t width;
+    uint32_t height;
+    /**
+     * - 0, nv12
+     *
+     * only support nv12
+     */
+    uint32_t format;
+    // in ms
+    uint64_t time;
+    uint32_t size;
+    uint32_t reserved;
+} frame_header;
+
+uint64_t get_time_us()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (uint64_t)tv.tv_sec * 1000000 + (uint64_t)tv.tv_usec;
+}
 
 int init_socket(const char *path)
 {
@@ -36,11 +58,10 @@ int init_socket(const char *path)
         return -1;
     }
 
-    printf("socket connect success\n");
     return 0;
 }
 
-int send_socket(uint32_t width, uint32_t height, void *data, uint32_t size)
+int send_frame(uint32_t width, uint32_t height, void *data, uint32_t size)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -70,7 +91,7 @@ int send_socket(uint32_t width, uint32_t height, void *data, uint32_t size)
     while (data_sent < size)
     {
         uint32_t st = send(fd, (char *)data + data_sent, size - data_sent, MSG_NOSIGNAL);
-        if (st <= 0)
+        if (st == -1)
         {
             perror("socket send data error");
             return -1;
@@ -82,7 +103,7 @@ int send_socket(uint32_t width, uint32_t height, void *data, uint32_t size)
     return 0;
 }
 
-int close_socket()
+void close_socket()
 {
     if (fd >= 0)
     {

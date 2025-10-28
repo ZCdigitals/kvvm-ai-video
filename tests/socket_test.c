@@ -11,6 +11,8 @@
 #define VIDEO_HEIGHT 1080
 #define OUTPUT_PATH "/tmp/capture.sock"
 
+#define FRAME_DURATION 33333
+
 // 全局标志位，用于控制主循环
 static volatile int keep_running = 1;
 
@@ -31,7 +33,6 @@ int read_file(unsigned char **buffer)
     fseek(fd, 0, SEEK_END);
     int size = ftell(fd);
     fseek(fd, 0, SEEK_SET);
-    fprintf(stdout, "size %d\n", size);
 
     unsigned char *buf = (unsigned char *)malloc(size);
     if (buf == NULL)
@@ -41,7 +42,6 @@ int read_file(unsigned char **buffer)
         return -1;
     }
     size_t read = fread(buf, 1, size, fd);
-    fprintf(stdout, "read %d\n", (int)read);
 
     if (read != size)
     {
@@ -62,12 +62,14 @@ int main()
     unsigned char **buffer;
 
     size_t size = read_file(buffer);
+    if (size == -1)
+    {
+        return -1;
+    }
 
     int ret = init_socket(OUTPUT_PATH);
-    if (ret < 0)
+    if (ret == -1)
     {
-        fprintf(stderr, "init error %x\n", ret);
-        free(buffer);
         return -1;
     }
 
@@ -77,21 +79,18 @@ int main()
 
     while (keep_running)
     {
-        ret = send_socket(VIDEO_WIDTH, VIDEO_HEIGHT, *buffer, size);
-        usleep(33333);
-        if (ret < 0)
+        ret = send_frame(VIDEO_WIDTH, VIDEO_HEIGHT, *buffer, size);
+        if (ret == -1)
         {
             main_stop();
         }
+        else
+        {
+            usleep(FRAME_DURATION);
+        }
     }
 
-    ret = close_socket();
-    if (ret < 0)
-    {
-        fprintf(stderr, "close error %x\n", ret);
-    }
-
-    free(buffer);
+    close_socket();
 
     return 0;
 }
