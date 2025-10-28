@@ -1,4 +1,5 @@
 #include <stdio.h>
+
 #include "video.h"
 
 #define VIDEO_PATH "/dev/video0"
@@ -45,14 +46,14 @@ int main()
     // capture
     unsigned int buffer_index = capture_v4l2_frame(&frame_data_y, &frame_size_y, &frame_data_uv, &frame_size_uv);
 
-    if (buffer_index != NULL)
+    if (buffer_index != -1)
     {
         // save file
         save_data_nv12(OUTPUT_PATH, frame_data_y, frame_size_y, frame_data_uv, frame_size_uv);
     }
     else
     {
-        print("null buffer\n");
+        printf("null buffer\n");
     }
 
     // stop

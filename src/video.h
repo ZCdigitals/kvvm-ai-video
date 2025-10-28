@@ -27,9 +27,9 @@ int start_v4l2_capture(void);
  * @param frame_size_y output y size pointer
  * @param frame_data_uv output uv data pointer pointer
  * @param frame_size_uv output nv size pointer
- * @return buffer index, returns NULL when error
+ * @return buffer index, returns -1 when error
  */
-unsigned int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_data_uv, size_t *frame_size_uv);
+int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_data_uv, size_t *frame_size_uv);
 
 /**
  * stop v4l2 caputre

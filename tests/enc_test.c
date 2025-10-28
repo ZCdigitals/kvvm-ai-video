@@ -19,6 +19,7 @@
 
 #define VENC_CHANNEL 0
 
+// https://wiki.luckfox.com/zh/Luckfox-Pico-Pro-Max/MPI/
 // read `media/rockit/rockit/mpi/example/mod/test_mpi_venc.cpp`
 
 int success(const char *msg)
@@ -38,8 +39,7 @@ int32_t read_image_nv12(void *vir_addr, uint32_t width, uint32_t height, uint32_
     uint32_t size = 0;
 
     uint8_t *buffer_y = vir_addr;
-    uint8_t *buffer_u = buffer_y + vir_width * vir_height;
-    uint8_t *buffer_v = buffer_u + vir_width * vir_height / 4;
+    uint8_t *buffer_uv = buffer_y + vir_width * vir_height;
 
     for (row = 0; row < vir_height; row++)
     {
@@ -52,7 +52,7 @@ int32_t read_image_nv12(void *vir_addr, uint32_t width, uint32_t height, uint32_
 
     for (row = 0; row < vir_height / 2; row++)
     {
-        size = fread(buffer_u + row * vir_width, 1, width, f);
+        size = fread(buffer_uv + row * vir_width, 1, width, f);
         if (size != width)
         {
             return RK_FAILURE;
@@ -136,6 +136,7 @@ int main()
     }
     success("start receive frame ok\n");
 
+    // loop start
     // use memory
     MB_BLK block = RK_MPI_MB_GetMB(memory_pool, venc_attr.stVencAttr.u32BufSize, RK_TRUE);
     if (block == RK_NULL)

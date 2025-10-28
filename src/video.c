@@ -177,7 +177,7 @@ int start_v4l2_capture(void)
     return 0;
 }
 
-unsigned int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_data_uv, size_t *frame_size_uv)
+int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_data_uv, size_t *frame_size_uv)
 {
     struct v4l2_buffer buf;
     struct v4l2_plane planes[VIDEO_MAX_PLANES];
@@ -192,7 +192,7 @@ unsigned int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void 
     if (ioctl(fd, VIDIOC_DQBUF, &buf) == -1)
     {
         perror("video device dequeue buffer error");
-        return NULL;
+        return -1;
     }
 
     *frame_data_y = buffers[buf.index].planes[0].start;
@@ -204,7 +204,7 @@ unsigned int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void 
     if (ioctl(fd, VIDIOC_QBUF, &buf) == -1)
     {
         perror("video device requeue buffer error");
-        return NULL;
+        return -1;
     }
 
     return buf.index;

@@ -51,7 +51,11 @@ if(BUILD_TARGET_TESTS)
     # build enc test
     add_executable(
         enc_test
-        "tests/enc_test.c"
+        "tests/enc_test2.c"
+        "src/enc.c"
+    )
+    target_include_directories(enc_test PRIVATE
+        ${PROJECT_SOURCE_DIR}/src
     )
     # link
     target_link_libraries(enc_test PRIVATE
