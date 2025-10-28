@@ -3,7 +3,6 @@ project(video C)
 
 include_directories(
     ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/src
 )
 
 # 查找库文件
@@ -46,4 +45,7 @@ add_executable(
     "tests/socket_test.c"
     "src/socket.c"
     "src/time.c"
+)
+target_include_directories(socket_test PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
 )

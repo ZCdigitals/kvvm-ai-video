@@ -9,7 +9,7 @@
 #define VIDEO_PATH "data/frame.h264"
 #define VIDEO_WIDTH 1920
 #define VIDEO_HEIGHT 1080
-#define OUTPUT_PATH "/tmp/capture"
+#define OUTPUT_PATH "/tmp/capture.sock"
 
 // 全局标志位，用于控制主循环
 static volatile int keep_running = 1;
@@ -22,7 +22,7 @@ void main_stop()
 int read_file(unsigned char **buffer)
 {
     FILE *fd = fopen(VIDEO_PATH, "rb");
-    if (fd < 0)
+    if (fd == NULL)
     {
         perror("read file error");
         return -1;
@@ -31,14 +31,18 @@ int read_file(unsigned char **buffer)
     fseek(fd, 0, SEEK_END);
     int size = ftell(fd);
     fseek(fd, 0, SEEK_SET);
+    fprintf(stdout, "size %d\n", size);
 
     unsigned char *buf = (unsigned char *)malloc(size);
-    if (buf)
+    if (buf == NULL)
     {
         perror("malloc error");
+        fclose(fd);
         return -1;
     }
     size_t read = fread(buf, 1, size, fd);
+    fprintf(stdout, "read %d\n", (int)read);
+
     if (read != size)
     {
         perror("read error");
@@ -50,7 +54,6 @@ int read_file(unsigned char **buffer)
     *buffer = buf;
 
     fclose(fd);
-
     return size;
 }
 
@@ -74,8 +77,12 @@ int main()
 
     while (keep_running)
     {
-        send_socket(VIDEO_WIDTH, VIDEO_HEIGHT, *buffer, size);
+        ret = send_socket(VIDEO_WIDTH, VIDEO_HEIGHT, *buffer, size);
         usleep(33333);
+        if (ret < 0)
+        {
+            main_stop();
+        }
     }
 
     ret = close_socket();

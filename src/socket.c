@@ -15,7 +15,7 @@ static int32_t frame_id = 0;
 int init_socket(const char *path)
 {
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (fd < 0)
+    if (fd == -1)
     {
         perror("socket error");
         return -1;
@@ -28,7 +28,7 @@ int init_socket(const char *path)
     strncpy(address.sun_path, path, sizeof(address.sun_path) - 1);
 
     int ret = connect(fd, (struct sockaddr *)&address, sizeof(address));
-    if (ret < 0)
+    if (ret == -1)
     {
         perror("socket connect error");
         close(fd);
