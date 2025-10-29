@@ -5,6 +5,7 @@
 #include <sys/time.h>
 
 #include "socket.h"
+#include "utils.h"
 
 #define VIDEO_PATH "data/frame.h264"
 #define VIDEO_WIDTH 1920
@@ -14,7 +15,8 @@
 #define FRAME_DURATION 33333
 
 // 全局标志位，用于控制主循环
-static volatile int keep_running = 1;
+static int keep_running = 1;
+static int frame_id = 0;
 
 void main_stop()
 {
@@ -67,7 +69,7 @@ int main()
         return -1;
     }
 
-    int ret = init_socket(OUTPUT_PATH);
+    int ret = init_socket(OUTPUT_PATH, VIDEO_WIDTH, VIDEO_HEIGHT);
     if (ret == -1)
     {
         return -1;
@@ -79,7 +81,7 @@ int main()
 
     while (keep_running)
     {
-        ret = send_frame(VIDEO_WIDTH, VIDEO_HEIGHT, *buffer, size);
+        ret = send_frame(frame_id, get_time_us(), *buffer, size);
         if (ret == -1)
         {
             main_stop();

@@ -7,8 +7,11 @@
 #include <sys/time.h>
 #include <sys/un.h>
 
-static volatile int fd = -1;
-static volatile int32_t frame_id = 0;
+#include "utils.h"
+
+static uint32_t picture_width = 0;
+static uint32_t picture_height = 0;
+static int fd = -1;
 
 typedef struct
 {
@@ -27,15 +30,12 @@ typedef struct
     uint32_t reserved;
 } frame_header;
 
-uint64_t get_time_us()
+int init_socket(const char *path, uint32_t width, uint32_t height)
 {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (uint64_t)tv.tv_sec * 1000000 + (uint64_t)tv.tv_usec;
-}
+    // set data
+    picture_width = width;
+    picture_height = height;
 
-int init_socket(const char *path)
-{
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd == -1)
     {
@@ -61,22 +61,20 @@ int init_socket(const char *path)
     return 0;
 }
 
-int send_frame(uint32_t width, uint32_t height, void *data, uint32_t size)
+int send_frame(uint32_t id, uint64_t time, void *data, uint32_t size)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
     frame_header header = {
-        .id = frame_id,
-        .width = width,
-        .height = height,
+        .id = id,
+        .width = picture_width,
+        .height = picture_height,
         .format = 0,
-        .time = get_time_us(),
+        .time = time,
         .size = size,
         .reserved = 0,
     };
-
-    frame_id += 1;
 
     // send header
     ssize_t sent = send(fd, &header, sizeof(header), MSG_NOSIGNAL);

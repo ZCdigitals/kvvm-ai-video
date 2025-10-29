@@ -15,6 +15,7 @@ if(BUILD_HOST_TESTS)
         socket_test
         "tests/socket_test.c"
         "src/socket.c"
+        "src/utils.c"
     )
     target_include_directories(socket_test PRIVATE
         ${PROJECT_SOURCE_DIR}/src
