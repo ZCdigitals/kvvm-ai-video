@@ -7,7 +7,7 @@
 #include "socket.h"
 #include "utils.h"
 
-#define VIDEO_PATH "data/frame.h264"
+#define VIDEO_PATH "frame.h264"
 #define VIDEO_WIDTH 1920
 #define VIDEO_HEIGHT 1080
 #define OUTPUT_PATH "/tmp/capture.sock"
@@ -61,9 +61,9 @@ int read_file(unsigned char **buffer)
 
 int main()
 {
-    unsigned char **buffer;
+    unsigned char *buffer;
 
-    size_t size = read_file(buffer);
+    size_t size = read_file(&buffer);
     if (size == -1)
     {
         return -1;
@@ -81,7 +81,7 @@ int main()
 
     while (keep_running)
     {
-        ret = send_frame(frame_id, get_time_us(), *buffer, size);
+        ret = send_frame(frame_id, get_time_us(), buffer, size);
         if (ret == -1)
         {
             main_stop();
@@ -93,6 +93,7 @@ int main()
     }
 
     close_socket();
+    free(buffer);
 
     return 0;
 }

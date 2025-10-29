@@ -12,12 +12,12 @@ include_directories(
 if(BUILD_HOST_TESTS)
     # build socket test
     add_executable(
-        socket_test
-        "tests/socket_test.c"
+        unit_socket_test
+        "tests/unit_socket_test.c"
         "src/socket.c"
         "src/utils.c"
     )
-    target_include_directories(socket_test PRIVATE
+    target_include_directories(unit_socket_test PRIVATE
         ${PROJECT_SOURCE_DIR}/src
     )
 endif()
