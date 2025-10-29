@@ -1,33 +1,18 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
+#include <linux/videodev2.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <linux/videodev2.h>
+#include <unistd.h>
 
 #include "video.h"
+#include "utils.h"
 
-#define BUFFER_COUNT 4
+static int fd = -1;
 
-struct buffer_plane
-{
-    void *start;
-    size_t length;
-};
-
-struct buffer
-{
-    struct buffer_plane planes[VIDEO_MAX_PLANES];
-    int n_planes;
-};
-
-static volatile int fd = -1;
-static volatile struct buffer *buffers = NULL;
-static volatile unsigned int n_buffers = 0;
-
-int init_v4l2(const char *path, int width, int height)
+unsigned int init_v4l2(const char *path, int width, int height, unsigned int buffer_count)
 {
     struct v4l2_capability cap;
 
@@ -35,7 +20,7 @@ int init_v4l2(const char *path, int width, int height)
     if (fd == -1)
     {
         perror("video device open error");
-        return -1;
+        return 0;
     }
 
     // check device capabilities
@@ -43,21 +28,21 @@ int init_v4l2(const char *path, int width, int height)
     {
         perror("video device query capabilities error");
         close(fd);
-        return -1;
+        return 0;
     }
 
     if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE_MPLANE))
     {
         perror("video device not support multi plane");
         close(fd);
-        return -1;
+        return 0;
     }
 
     if (!(cap.capabilities & V4L2_CAP_STREAMING))
     {
         perror("video device not support streaming");
         close(fd);
-        return -1;
+        return 0;
     }
 
     // setup start
@@ -67,118 +52,89 @@ int init_v4l2(const char *path, int width, int height)
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
     fmt.fmt.pix_mp.width = width;
     fmt.fmt.pix_mp.height = height;
-    fmt.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12;
-    fmt.fmt.pix_mp.field = V4L2_FIELD_NONE;
-    fmt.fmt.pix_mp.num_planes = 2;
+    fmt.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_YUYV;
+    fmt.fmt.pix_mp.field = V4L2_FIELD_ANY;
+    // fmt.fmt.pix_mp.num_planes = 1;
 
-    fmt.fmt.pix_mp.plane_fmt[0].bytesperline = width;
-    fmt.fmt.pix_mp.plane_fmt[0].sizeimage = width * height;
-    fmt.fmt.pix_mp.plane_fmt[1].bytesperline = width;
-    fmt.fmt.pix_mp.plane_fmt[1].sizeimage = width * height / 2;
+    // fmt.fmt.pix_mp.plane_fmt[0].bytesperline = width;
+    // fmt.fmt.pix_mp.plane_fmt[0].sizeimage = width * height;
+    // fmt.fmt.pix_mp.plane_fmt[1].bytesperline = width;
+    // fmt.fmt.pix_mp.plane_fmt[1].sizeimage = width * height / 2;
 
     if (ioctl(fd, VIDIOC_S_FMT, &fmt) == -1)
     {
         perror("video device set format error");
         close(fd);
-        return -1;
+        return 0;
     }
     // setup end
 
-    // init mmap start
+    // init buffers start
     struct v4l2_requestbuffers req;
 
     memset(&req, 0, sizeof(req));
-    req.count = BUFFER_COUNT;
+    req.count = buffer_count;
     req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-    req.memory = V4L2_MEMORY_MMAP;
+    req.memory = V4L2_MEMORY_DMABUF;
 
     if (ioctl(fd, VIDIOC_REQBUFS, &req) == -1)
     {
         perror("video device request buffer error");
         close(fd);
-        return -1;
+        return 0;
+    }
+
+    if (!(req.capabilities & V4L2_BUF_CAP_SUPPORTS_DMABUF))
+    {
+        perror("video buffers not support dma");
+        close(fd);
+        return 0;
     }
 
     if (req.count < 2)
     {
-        perror("video device buffer count not enough");
+        perror("video buffers count not enough");
         close(fd);
+        return 0;
+    }
+
+    return req.count;
+}
+
+int init_v4l2_buffer(unsigned int index, int plane_fd)
+{
+    struct v4l2_buffer vbuf;
+    struct v4l2_plane vplane;
+
+    memset(&vbuf, 0, sizeof(vbuf));
+    memset(&vplane, 0, sizeof(vplane));
+    vbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+    vbuf.memory = V4L2_MEMORY_DMABUF;
+    vbuf.index = index;
+    vbuf.length = 1;
+    vbuf.m.planes = &vplane;
+
+    // there is no need to do VIDIOC_QUERYBUF under dma
+    // if (ioctl(fd, VIDIOC_QUERYBUF, &vbuf) == -1)
+    // {
+    //     perror("video device query buffer error");
+    //     close(fd);
+    //     return -1;
+    // }
+
+    vplane.m.fd = plane_fd;
+
+    if (ioctl(fd, VIDIOC_QBUF, &vbuf) == -1)
+    {
+        perror("video device qbuffer error");
         return -1;
     }
-
-    n_buffers = req.count;
-    buffers = calloc(req.count, sizeof(*buffers));
-    if (!buffers)
-    {
-        perror("video device calloc buffers error");
-        close(fd);
-        return -1;
-    }
-
-    for (unsigned int i = 0; i < n_buffers; i++)
-    {
-        struct v4l2_buffer buf;
-        struct v4l2_plane planes[VIDEO_MAX_PLANES];
-
-        memset(&buf, 0, sizeof(buf));
-        memset(planes, 0, sizeof(planes));
-        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-        buf.memory = V4L2_MEMORY_MMAP;
-        buf.index = i;
-        buf.length = VIDEO_MAX_PLANES;
-        buf.m.planes = planes;
-
-        if (ioctl(fd, VIDIOC_QUERYBUF, &buf) == -1)
-        {
-            perror("video device query buffer error");
-            close(fd);
-            return -1;
-        }
-
-        buffers[i].n_planes = buf.length;
-
-        for (unsigned int j = 0; j < buf.length; j++)
-        {
-            buffers[i].planes[j].length = buf.m.planes[j].length;
-            buffers[i].planes[j].start = mmap(NULL, buf.m.planes[j].length,
-                                              PROT_READ | PROT_WRITE, MAP_SHARED,
-                                              fd, buf.m.planes[j].m.mem_offset);
-            if (MAP_FAILED == buffers[i].planes[j].start)
-            {
-                perror("video device set plane buffer error");
-                close(fd);
-                return -1;
-            }
-        }
-    }
-    // init mmap end
 
     return 0;
 }
 
-int start_v4l2_capture(void)
+int start_v4l2_capture()
 {
-
-    for (unsigned int i = 0; i < n_buffers; i++)
-    {
-        struct v4l2_buffer buf;
-        struct v4l2_plane planes[VIDEO_MAX_PLANES];
-
-        memset(&buf, 0, sizeof(buf));
-        memset(planes, 0, sizeof(planes));
-        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-        buf.memory = V4L2_MEMORY_MMAP;
-        buf.index = i;
-        buf.length = buffers[i].n_planes;
-        buf.m.planes = planes;
-
-        if (ioctl(fd, VIDIOC_QBUF, &buf) == -1)
-        {
-            perror("video device query buffer error");
-            return -1;
-        }
-    }
-
     enum v4l2_buf_type type;
     type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
     if (ioctl(fd, VIDIOC_STREAMON, &type) == -1)
@@ -190,17 +146,20 @@ int start_v4l2_capture(void)
     return 0;
 }
 
-int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_data_uv, size_t *frame_size_uv)
+static volatile struct v4l2_buffer *buffer = NULL;
+
+int capture_v4l2_frame(unsigned int *id, unsigned long long int *time)
 {
     struct v4l2_buffer buf;
-    struct v4l2_plane planes[VIDEO_MAX_PLANES];
+    struct v4l2_plane plane;
 
     memset(&buf, 0, sizeof(buf));
-    memset(planes, 0, sizeof(planes));
+    memset(&plane, 0, sizeof(plane));
     buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-    buf.memory = V4L2_MEMORY_MMAP;
-    buf.length = VIDEO_MAX_PLANES;
-    buf.m.planes = planes;
+    buf.memory = V4L2_MEMORY_DMABUF;
+    buf.length = 1;
+    buf.m.planes = &plane;
+    // plane.m.fd = plane_fd;
 
     if (ioctl(fd, VIDIOC_DQBUF, &buf) == -1)
     {
@@ -208,41 +167,28 @@ int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_d
         return -1;
     }
 
-    *frame_data_y = buffers[buf.index].planes[0].start;
-    *frame_size_y = buffers[buf.index].planes[0].length;
-    *frame_data_uv = buffers[buf.index].planes[1].start;
-    *frame_size_uv = buffers[buf.index].planes[1].length;
+    buffer = &buf;
+    *id = buf.sequence;
+    *time = sec_to_us(&buf.timestamp);
 
-    // add to queue after processing
-    if (ioctl(fd, VIDIOC_QBUF, &buf) == -1)
-    {
-        perror("video device requeue buffer error");
-        return -1;
-    }
-
-    return buf.index;
+    return plane.m.fd;
 }
 
-int capture_v4l2_frame_single_buffer(void *dst)
+int release_v4l2_frame()
 {
-    void *frame_data_y;
-    size_t frame_size_y;
-    void *frame_data_uv;
-    size_t frame_size_uv;
-
-    int ret = capture_v4l2_frame(&frame_data_y, &frame_size_y, &frame_data_uv, &frame_size_uv);
-    if (ret == -1)
+    if (buffer == NULL)
     {
+        errno = -1;
+        perror("null buffer, call `capture_v4l2_frame` first");
         return -1;
     }
 
-    // todo, maybe could be zero copy
-    // for now, multiple planes must copy memory
-
-    memcpy(dst, frame_data_y, frame_size_y);
-    memcpy((char *)dst + frame_size_y, frame_data_uv, frame_size_uv);
-
-    return 0;
+    if (ioctl(fd, VIDIOC_QUERYBUF, buffer) == -1)
+    {
+        perror("video device query buffer error");
+        close(fd);
+        return -1;
+    }
 }
 
 int stop_v4l2_capture()
@@ -261,23 +207,6 @@ int stop_v4l2_capture()
 
 void close_v4l2()
 {
-    if (buffers)
-    {
-        for (unsigned int i = 0; i < n_buffers; i++)
-        {
-            for (unsigned int j = 0; j < buffers[i].n_planes; j++)
-            {
-                if (buffers[i].planes[j].start != MAP_FAILED)
-                {
-                    munmap(buffers[i].planes[j].start, buffers[i].planes[j].length);
-                }
-            }
-        }
-        free(buffers);
-        buffers = NULL;
-        n_buffers = 0;
-    }
-
     if (fd >= 0)
     {
         close(fd);

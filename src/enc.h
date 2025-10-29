@@ -21,8 +21,10 @@ int init_venc(unsigned int bit_rate, unsigned int gop, unsigned int width, unsig
  */
 int start_venc();
 
-void *use_venc_frame();
-int send_venc_frame(unsigned int width, unsigned int height, bool is_end);
+int use_venc_frame();
+int send_venc_frame(int fd, unsigned int id, unsigned long long int time, bool is_end);
+int free_venc_frame(int fd);
+
 int read_venc_frame(void **dst, unsigned int *size);
 int release_venc_frame();
 

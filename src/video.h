@@ -9,29 +9,22 @@
  * @param path file path, eg. `/dev/video0`
  * @param width video width
  * @param height video height
- * @return 0 ok, -1 error
+ * @param buffer_count buffer count
+ * @return buffer count, 0 is error
  */
-int init_v4l2(const char *path, int width, int height);
+unsigned int init_v4l2(const char *path, int width, int height, unsigned int buffer_count);
+
+int init_v4l2_buffer(unsigned int index, int plane_fd);
 
 /**
  * start v4l2 caputre
  *
  * @return 0 ok, -1 error
  */
-int start_v4l2_capture(void);
+int start_v4l2_capture();
 
-/**
- * caputre v4l2 frame
- *
- * @param frame_data_y output y data pointer pointer
- * @param frame_size_y output y size pointer
- * @param frame_data_uv output uv data pointer pointer
- * @param frame_size_uv output nv size pointer
- * @return buffer index, returns -1 when error
- */
-int capture_v4l2_frame(void **frame_data_y, size_t *frame_size_y, void **frame_data_uv, size_t *frame_size_uv);
-
-int capture_v4l2_frame_single_buffer(void *dst);
+int capture_v4l2_frame(unsigned int *id, unsigned long long int *time);
+int release_v4l2_frame();
 
 /**
  * stop v4l2 caputre

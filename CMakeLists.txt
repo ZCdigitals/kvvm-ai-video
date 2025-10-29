@@ -81,7 +81,7 @@ if(BUILD_UNIT_V4L2_ENC_TEST)
     )
 endif()
 
-if(BUILD_TARGET)
+if(BUILD_MAIN)
     # create exec
     add_executable(
         ${PROJECT_NAME}

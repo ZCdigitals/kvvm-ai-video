@@ -14,15 +14,27 @@
 #include "rk_mpi_venc.h"
 #include "rk_type.h"
 
+#include "utils.h"
+
 #define VENC_CHANNEL 0
 
-static volatile uint32_t memory_pool = MB_INVALID_POOLID;
+static uint32_t picture_width = 0;
+static uint32_t picture_height = 0;
+static uint32_t vir_width = 0;
+static uint32_t vir_height = 0;
+
+static uint32_t memory_pool = MB_INVALID_POOLID;
 static volatile uint32_t block_size;
-static volatile MB_BLK block = RK_NULL;
-static volatile VENC_STREAM_S stream;
+static VENC_STREAM_S stream;
 
 int init_venc(unsigned int bit_rate, unsigned int gop, unsigned int width, unsigned int height)
 {
+    // set data
+    picture_width = width;
+    picture_height = height;
+    vir_width = width;
+    vir_height = height;
+
     int32_t ret = RK_MPI_SYS_Init();
     if (ret != RK_SUCCESS)
     {
@@ -113,35 +125,37 @@ int start_venc()
     return 0;
 }
 
-void *use_venc_frame()
+int use_venc_frame()
 {
-    // release exist block
-    if (block != RK_NULL)
-    {
-        RK_MPI_MB_ReleaseMB(block);
-    }
-
     // get block
-    block = RK_MPI_MB_GetMB(memory_pool, block_size, RK_TRUE);
+    MB_BLK block = RK_MPI_MB_GetMB(memory_pool, block_size, RK_TRUE);
     if (block == RK_NULL)
     {
         errno = -1;
         perror("mpi memory get block error");
-        return NULL;
+        return -1;
     }
 
-    void *vir_addr = RK_MPI_MB_Handle2VirAddr(block);
+    int fd = RK_MPI_MMZ_Handle2Fd(block);
+    if (fd == -1)
+    {
+        errno = -1;
+        perror("mpi memory get block fd error");
+        return -1;
+    }
 
-    return vir_addr;
+    return fd;
 }
 
-int send_venc_frame(unsigned int width, unsigned int height, bool is_end)
+int send_venc_frame(int fd, unsigned int id, unsigned long long int time, bool is_end)
 {
+    MB_BLK block = RK_MPI_MMZ_Fd2Handle(fd);
+
     // check block
     if (block == RK_NULL)
     {
         errno = -1;
-        perror("no valid block available, call use_venc_frame first");
+        perror("null block");
         return -1;
     }
 
@@ -150,18 +164,22 @@ int send_venc_frame(unsigned int width, unsigned int height, bool is_end)
     {
         errno = ret;
         perror("mpi memory flush cache error");
-        goto error;
+        return -1;
     }
 
     VIDEO_FRAME_INFO_S frame;
     memset(&frame, 0, sizeof(VIDEO_FRAME_INFO_S));
     frame.stVFrame.pMbBlk = block;
-    frame.stVFrame.u32Width = width;
-    frame.stVFrame.u32Height = height;
-    frame.stVFrame.u32VirWidth = width;
-    frame.stVFrame.u32VirHeight = height;
+    frame.stVFrame.u32Width = picture_width;
+    frame.stVFrame.u32Height = picture_height;
+    frame.stVFrame.u32VirWidth = vir_width;
+    frame.stVFrame.u32VirHeight = vir_height;
     frame.stVFrame.enPixelFormat = RK_VIDEO_FMT_YUV;
-    frame.stVFrame.u32FrameFlag = is_end ? FRAME_FLAG_SNAP_END : 0;
+
+    frame.stVFrame.u32TimeRef = id;
+    frame.stVFrame.u64PTS = time;
+
+    frame.stVFrame.u32FrameFlag |= is_end ? FRAME_FLAG_SNAP_END : 0;
 
     // send frame
     ret = RK_MPI_VENC_SendFrame(VENC_CHANNEL, &frame, -1);
@@ -169,11 +187,18 @@ int send_venc_frame(unsigned int width, unsigned int height, bool is_end)
     {
         errno = ret;
         perror("mpi venc send frame error");
-        goto error;
+        return -1;
     }
 
+    return 0;
+}
+
+int free_venc_frame(int fd)
+{
+    MB_BLK block = RK_MPI_MMZ_Fd2Handle(fd);
+
     // release block
-    ret = RK_MPI_MB_ReleaseMB(block);
+    int ret = RK_MPI_MB_ReleaseMB(block);
     block = RK_NULL;
     if (ret != RK_SUCCESS)
     {
@@ -183,20 +208,6 @@ int send_venc_frame(unsigned int width, unsigned int height, bool is_end)
     }
 
     return 0;
-
-error:
-    if (block != RK_NULL)
-    {
-        ret = RK_MPI_MB_ReleaseMB(block);
-        block = RK_NULL;
-        if (ret != RK_SUCCESS)
-        {
-            errno = ret;
-            perror("mpi memory release block error");
-        }
-    }
-
-    return -1;
 }
 
 int read_venc_frame(void **dst, unsigned int *size)
@@ -246,18 +257,6 @@ void stop_venc()
     {
         free(stream.pstPack);
         stream.pstPack = NULL;
-    }
-
-    // release block
-    if (block != RK_NULL)
-    {
-        ret = RK_MPI_MB_ReleaseMB(block);
-        if (ret != RK_SUCCESS)
-        {
-            errno = ret;
-            perror("mpi memory release block error");
-        }
-        block = RK_NULL;
     }
 
     // stop

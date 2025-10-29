@@ -11,8 +11,3 @@ cmake -DBUILD_UNIT_V4L2_ENC_TEST=ON -DCMAKE_TOOLCHAIN_FILE=/workspace/toolchain.
 
 # make
 make -j$(nproc)
-
-# show result
-echo "Binary: $(pwd)/video"
-file video
-size video

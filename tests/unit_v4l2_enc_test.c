@@ -126,7 +126,7 @@ int main()
     ret = read_venc_frame(&frame, &size);
     if (ret == -1)
     {
-        return NULL;
+        return -1;
     }
 
     ret = save_data(OUTPUT_PATH, frame, size);
@@ -153,7 +153,6 @@ int main()
 
     close_v4l2();
     close_venc();
-    close_socket();
 
     return 0;
 }
