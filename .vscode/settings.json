@@ -20,6 +20,9 @@
         "ioctls.h": "c",
         "frame.h": "c",
         "error.h": "c",
-        "cerrno": "c"
+        "cerrno": "c",
+        "socket.h": "c",
+        "utils.h": "c",
+        "mman.h": "c"
     }
 }
