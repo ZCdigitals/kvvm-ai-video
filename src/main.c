@@ -126,14 +126,20 @@ int init()
 
     for (unsigned int i = 0; i < buffer_count; i += 1)
     {
-        int fd = use_venc_frame();
+        unsigned int plane_length = init_v4l2_buffer(i);
+        if (plane_length == 0)
+        {
+            goto error3;
+        }
+
+        int fd = use_venc_frame(plane_length);
         if (fd == -1)
         {
             goto error3;
         }
         buffers[i].fd = fd;
 
-        ret = init_v4l2_buffer(i, fd);
+        int ret = use_v4l2_buffer(fd);
         if (ret == -1)
         {
             goto error3;

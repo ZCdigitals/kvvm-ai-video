@@ -21,7 +21,7 @@ int init_venc(unsigned int bit_rate, unsigned int gop, unsigned int width, unsig
  */
 int start_venc();
 
-int use_venc_frame();
+int use_venc_frame(unsigned int size);
 int send_venc_frame(int fd, unsigned int id, unsigned long long int time, bool is_end);
 int free_venc_frame(int fd);
 

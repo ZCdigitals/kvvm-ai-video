@@ -1,13 +1,17 @@
+#include "video.h"
+
 #include <errno.h>
-#include <fcntl.h>
-#include <linux/videodev2.h>
 #include <stdio.h>
 #include <string.h>
+
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <unistd.h>
 
-#include "video.h"
+#include <linux/videodev2.h>
+
+#include <unistd.h>
+#include <fcntl.h>
+
 #include "utils.h"
 
 static int fd = -1;
@@ -22,6 +26,7 @@ unsigned int init_v4l2(const char *path, int width, int height, unsigned int buf
         perror("video device open error");
         return 0;
     }
+    printf("video device open ok\n");
 
     // check device capabilities
     if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == -1)
@@ -30,13 +35,15 @@ unsigned int init_v4l2(const char *path, int width, int height, unsigned int buf
         close(fd);
         return 0;
     }
+    printf("video device query capabilities ok\n");
 
     if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE_MPLANE))
     {
-        perror("video device not support multi plane");
+        perror("video device not support capture multiple plane");
         close(fd);
         return 0;
     }
+    printf("video device support capture multiple plane\n");
 
     if (!(cap.capabilities & V4L2_CAP_STREAMING))
     {
@@ -44,6 +51,7 @@ unsigned int init_v4l2(const char *path, int width, int height, unsigned int buf
         close(fd);
         return 0;
     }
+    printf("video device support streaming\n");
 
     // setup start
     struct v4l2_format fmt;
@@ -67,6 +75,7 @@ unsigned int init_v4l2(const char *path, int width, int height, unsigned int buf
         close(fd);
         return 0;
     }
+    printf("video device set format ok\n");
     // setup end
 
     // init buffers start
@@ -83,6 +92,7 @@ unsigned int init_v4l2(const char *path, int width, int height, unsigned int buf
         close(fd);
         return 0;
     }
+    printf("video device request buffer ok\n");
 
     if (!(req.capabilities & V4L2_BUF_CAP_SUPPORTS_DMABUF))
     {
@@ -90,6 +100,7 @@ unsigned int init_v4l2(const char *path, int width, int height, unsigned int buf
         close(fd);
         return 0;
     }
+    printf("video buffers support dma\n");
 
     if (req.count < 2)
     {
@@ -97,15 +108,16 @@ unsigned int init_v4l2(const char *path, int width, int height, unsigned int buf
         close(fd);
         return 0;
     }
+    printf("video buffers count %d\n", req.count);
 
     return req.count;
 }
 
-int init_v4l2_buffer(unsigned int index, int plane_fd)
-{
-    struct v4l2_buffer vbuf;
-    struct v4l2_plane vplane;
+static struct v4l2_buffer vbuf;
+static struct v4l2_plane vplane;
 
+unsigned int init_v4l2_buffer(unsigned int index)
+{
     memset(&vbuf, 0, sizeof(vbuf));
     memset(&vplane, 0, sizeof(vplane));
     vbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
@@ -114,21 +126,27 @@ int init_v4l2_buffer(unsigned int index, int plane_fd)
     vbuf.length = 1;
     vbuf.m.planes = &vplane;
 
-    // there is no need to do VIDIOC_QUERYBUF under dma
-    // if (ioctl(fd, VIDIOC_QUERYBUF, &vbuf) == -1)
-    // {
-    //     perror("video device query buffer error");
-    //     close(fd);
-    //     return -1;
-    // }
+    if (ioctl(fd, VIDIOC_QUERYBUF, &vbuf) == -1)
+    {
+        perror("video device query buffer error");
+        close(fd);
+        return -1;
+    }
+    printf("video device query buffer ok\n");
 
+    return vplane.length;
+}
+
+int use_v4l2_buffer(int plane_fd)
+{
     vplane.m.fd = plane_fd;
 
     if (ioctl(fd, VIDIOC_QBUF, &vbuf) == -1)
     {
-        perror("video device qbuffer error");
+        perror("video device queue buffer error");
         return -1;
     }
+    printf("video device queue buffer ok\n");
 
     return 0;
 }
@@ -142,6 +160,7 @@ int start_v4l2_capture()
         perror("video device start streaming error");
         return -1;
     }
+    printf("video device start streaming ok\n");
 
     return 0;
 }
@@ -166,6 +185,7 @@ int capture_v4l2_frame(unsigned int *id, unsigned long long int *time)
         perror("video device dequeue buffer error");
         return -1;
     }
+    printf("video device dequeue buffer ok\n");
 
     buffer = &buf;
     *id = buf.sequence;
@@ -183,12 +203,13 @@ int release_v4l2_frame()
         return -1;
     }
 
-    if (ioctl(fd, VIDIOC_QUERYBUF, buffer) == -1)
+    if (ioctl(fd, VIDIOC_QBUF, buffer) == -1)
     {
-        perror("video device query buffer error");
+        perror("video device queue buffer error");
         close(fd);
         return -1;
     }
+    printf("video device queue buffer ok\n");
 }
 
 int stop_v4l2_capture()
@@ -201,6 +222,7 @@ int stop_v4l2_capture()
         perror("video device stop stream error");
         return -1;
     }
+    printf("video device stop stream ok\n");
 
     return 0;
 }
@@ -211,5 +233,6 @@ void close_v4l2()
     {
         close(fd);
         fd = -1;
+        printf("video device close ok\n");
     }
 }

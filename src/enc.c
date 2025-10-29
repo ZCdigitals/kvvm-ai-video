@@ -1,6 +1,6 @@
+#include "enc.h"
+
 #include <errno.h>
-#include <math.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -24,7 +24,6 @@ static uint32_t vir_width = 0;
 static uint32_t vir_height = 0;
 
 static uint32_t memory_pool = MB_INVALID_POOLID;
-static volatile uint32_t block_size;
 static VENC_STREAM_S stream;
 
 int init_venc(unsigned int bit_rate, unsigned int gop, unsigned int width, unsigned int height)
@@ -42,6 +41,7 @@ int init_venc(unsigned int bit_rate, unsigned int gop, unsigned int width, unsig
         perror("mpi init error");
         return -1;
     }
+    printf("mpi init ok\n");
 
     VENC_CHN_ATTR_S venc_attr;
     memset(&venc_attr, 0, sizeof(venc_attr));
@@ -65,7 +65,7 @@ int init_venc(unsigned int bit_rate, unsigned int gop, unsigned int width, unsig
     pic_buf_attr.enPixelFormat = RK_VIDEO_FMT_YUV;
     ret = RK_MPI_CAL_COMM_GetPicBufferSize(&pic_buf_attr, &mb_pic_cal);
     venc_attr.stVencAttr.u32BufSize = mb_pic_cal.u32MBSize;
-    block_size = mb_pic_cal.u32MBSize;
+    printf("mpi calculate ok\n");
 
     // set h264 struct props
     venc_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264CBR;
@@ -79,6 +79,7 @@ int init_venc(unsigned int bit_rate, unsigned int gop, unsigned int width, unsig
         perror("mpi venc channel create error");
         goto error1;
     }
+    printf("mpi venc channel create ok\n");
 
     // init memory pool
     MB_POOL_CONFIG_S memory_pool_config;
@@ -95,6 +96,7 @@ int init_venc(unsigned int bit_rate, unsigned int gop, unsigned int width, unsig
         perror("mpi memory pool create error");
         goto error2;
     }
+    printf("mpi memory pool create ok\n");
 
     return 0;
 
@@ -119,22 +121,24 @@ int start_venc()
         perror("mpi start receive frame error");
         return -1;
     }
+    printf("mpi start receive frame ok\n");
 
     stream.pstPack = malloc(sizeof(VENC_PACK_S));
 
     return 0;
 }
 
-int use_venc_frame()
+int use_venc_frame(unsigned int size)
 {
     // get block
-    MB_BLK block = RK_MPI_MB_GetMB(memory_pool, block_size, RK_TRUE);
+    MB_BLK block = RK_MPI_MB_GetMB(memory_pool, size, RK_TRUE);
     if (block == RK_NULL)
     {
         errno = -1;
         perror("mpi memory get block error");
         return -1;
     }
+    printf("mpi memory get block ok\n");
 
     int fd = RK_MPI_MMZ_Handle2Fd(block);
     if (fd == -1)
@@ -143,6 +147,7 @@ int use_venc_frame()
         perror("mpi memory get block fd error");
         return -1;
     }
+    printf("mpi memory get block fd ok\n");
 
     return fd;
 }
@@ -166,6 +171,7 @@ int send_venc_frame(int fd, unsigned int id, unsigned long long int time, bool i
         perror("mpi memory flush cache error");
         return -1;
     }
+    printf("mpi memory flush cache ok\n");
 
     VIDEO_FRAME_INFO_S frame;
     memset(&frame, 0, sizeof(VIDEO_FRAME_INFO_S));
@@ -189,6 +195,7 @@ int send_venc_frame(int fd, unsigned int id, unsigned long long int time, bool i
         perror("mpi venc send frame error");
         return -1;
     }
+    printf("mpi venc send frame ok\n");
 
     return 0;
 }
@@ -206,6 +213,7 @@ int free_venc_frame(int fd)
         perror("mpi memory release block error");
         return -1;
     }
+    printf("mpi memory release block ok\n");
 
     return 0;
 }
@@ -220,6 +228,7 @@ int read_venc_frame(void **dst, unsigned int *size)
         perror("mpi venc get stream error");
         return -1;
     }
+    printf("mpi venc get stream ok\n");
 
     // read to destnation
     void *d = RK_MPI_MB_Handle2VirAddr(stream.pstPack->pMbBlk);
@@ -239,6 +248,7 @@ int release_venc_frame()
         perror("mpi venc release stream error");
         return -1;
     }
+    printf("mpi venc release stream ok\n");
 
     if (stream.pstPack->bStreamEnd == RK_TRUE)
     {
@@ -266,6 +276,7 @@ void stop_venc()
         errno = ret;
         perror("mpi stop receive frame error");
     }
+    printf("mpi stop receive frame ok\n");
 
     if (memory_pool != MB_INVALID_POOLID)
     {
@@ -275,6 +286,7 @@ void stop_venc()
             errno = ret;
             perror("mpi memory pool destory error");
         }
+        printf("mpi memory pool destory ok\n");
     }
 }
 
@@ -286,6 +298,7 @@ void close_venc()
         errno = ret;
         perror("mpi venc channel destory error");
     }
+    printf("mpi venc channel destory ok\n");
 
     ret = RK_MPI_SYS_Exit();
     if (ret != RK_SUCCESS)
@@ -293,4 +306,5 @@ void close_venc()
         errno = ret;
         perror("mpi exit error");
     }
+    printf("mpi exit ok\n");
 }

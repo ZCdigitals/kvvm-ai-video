@@ -1,5 +1,6 @@
+#include "utils.h"
+
 #include <stdlib.h>
-#include <sys/time.h>
 
 #define US_PER_SECOND 1000000
 

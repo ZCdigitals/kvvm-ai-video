@@ -23,6 +23,9 @@
         "cerrno": "c",
         "socket.h": "c",
         "utils.h": "c",
-        "mman.h": "c"
+        "mman.h": "c",
+        "string.h": "c",
+        "errno.h": "c",
+        "rk_mpi_cal.h": "c"
     }
 }

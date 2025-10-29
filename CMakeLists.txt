@@ -64,17 +64,31 @@ endif()
 
 if(BUILD_UNIT_V4L2_ENC_TEST)
     #build unit v4l2 enc test
+    # add_executable(
+    #     unit_v4l2_enc_test
+    #     "tests/unit_v4l2_enc_test.c"
+    #     "src/enc.c"
+    #     "src/video.c"
+    #     "src/utils.c"
+    # )
+    # target_include_directories(unit_v4l2_enc_test PRIVATE
+    #     ${PROJECT_SOURCE_DIR}/src
+    # )
+    # target_link_libraries(unit_v4l2_enc_test PRIVATE
+    #     ${ROCKIT_LIB}
+    #     ${ROCKCHIP_MPP_LIB}
+    #     ${RGA_LIB}
+    # )
+
+
     add_executable(
-        unit_v4l2_enc_test
-        "tests/unit_v4l2_enc_test.c"
-        "src/enc.c"
-        "src/video.c"
-        "src/utils.c"
+        ee
+        "tests/ee.c"
     )
-    target_include_directories(unit_v4l2_enc_test PRIVATE
-        ${PROJECT_SOURCE_DIR}/src
-    )
-    target_link_libraries(unit_v4l2_enc_test PRIVATE
+    # target_include_directories(unit_v4l2_enc_test PRIVATE
+    #     ${PROJECT_SOURCE_DIR}/src
+    # )
+    target_link_libraries(ee PRIVATE
         ${ROCKIT_LIB}
         ${ROCKCHIP_MPP_LIB}
         ${RGA_LIB}

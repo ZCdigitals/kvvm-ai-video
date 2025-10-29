@@ -1,8 +1,6 @@
 #ifndef V4L2_CAPTURE_H
 #define V4L2_CAPTURE_H
 
-#include <stddef.h>
-
 /**
  * init v4l2 device
  *
@@ -14,7 +12,8 @@
  */
 unsigned int init_v4l2(const char *path, int width, int height, unsigned int buffer_count);
 
-int init_v4l2_buffer(unsigned int index, int plane_fd);
+unsigned int init_v4l2_buffer(unsigned int index);
+int use_v4l2_buffer(int plane_fd);
 
 /**
  * start v4l2 caputre
