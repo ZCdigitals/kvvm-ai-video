@@ -548,7 +548,7 @@ void *output(void *arg)
 
 void main_stop()
 {
-    keep_running = true;
+    keep_running = false;
 }
 
 int main()
