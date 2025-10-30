@@ -57,37 +57,41 @@ int save_data(void *data, unsigned int size)
  */
 static volatile bool keep_running = true;
 
-unsigned int init_venc(int channel_id, unsigned int width, unsigned int height, unsigned int bit_rate, unsigned int gop, unsigned int buffer_count)
+int calculate_venc(unsigned int width, unsigned int height, MB_PIC_CAL_S *mb_pic_cal)
+{
+
+    PIC_BUF_ATTR_S pic_buf_attr;
+    memset(&pic_buf_attr, 0, sizeof(PIC_BUF_ATTR_S));
+    memset(mb_pic_cal, 0, sizeof(MB_PIC_CAL_S));
+    pic_buf_attr.u32Width = width;
+    pic_buf_attr.u32Height = height;
+    pic_buf_attr.enPixelFormat = RK_FMT_YUV422_YUYV;
+
+    int32_t ret = RK_MPI_CAL_COMM_GetPicBufferSize(&pic_buf_attr, mb_pic_cal);
+    if (ret == -1)
+    {
+        errno = ret;
+        perror("mpi calcualte error");
+        return -1;
+    }
+    printf("mpi calculate ok %d\n", mb_pic_cal->u32MBSize);
+
+    return 0;
+}
+
+int init_venc(int channel_id, unsigned int width, unsigned int height, unsigned int bit_rate, unsigned int gop, unsigned int buffer_count, MB_PIC_CAL_S mb_pic_cal)
 {
     int32_t ret = RK_MPI_SYS_Init();
     if (ret != RK_SUCCESS)
     {
         errno = ret;
         perror("mpi init error");
-        return MB_INVALID_POOLID;
+        return -1;
     }
     printf("mpi init ok\n");
 
     VENC_CHN_ATTR_S venc_attr;
     memset(&venc_attr, 0, sizeof(venc_attr));
-
-    // calculate
-    PIC_BUF_ATTR_S pic_buf_attr;
-    MB_PIC_CAL_S mb_pic_cal;
-    memset(&pic_buf_attr, 0, sizeof(PIC_BUF_ATTR_S));
-    memset(&mb_pic_cal, 0, sizeof(MB_PIC_CAL_S));
-    pic_buf_attr.u32Width = width;
-    pic_buf_attr.u32Height = height;
-    pic_buf_attr.enPixelFormat = RK_FMT_YUV422_YUYV;
-
-    int32_t ret = RK_MPI_CAL_COMM_GetPicBufferSize(&pic_buf_attr, &mb_pic_cal);
-    if (ret == -1)
-    {
-        errno = ret;
-        perror("mpi calcualte error");
-        return MB_INVALID_POOLID;
-    }
-    printf("mpi calculate ok %d\n", mb_pic_cal.u32MBSize);
 
     // set h264
     venc_attr.stVencAttr.enType = RK_VIDEO_ID_AVC;
@@ -97,7 +101,7 @@ unsigned int init_venc(int channel_id, unsigned int width, unsigned int height, 
     venc_attr.stVencAttr.u32PicHeight = height;
     venc_attr.stVencAttr.u32VirWidth = mb_pic_cal.u32VirWidth;
     venc_attr.stVencAttr.u32VirHeight = mb_pic_cal.u32VirHeight;
-    venc_attr.stVencAttr.u32StreamBufCnt = 3;
+    venc_attr.stVencAttr.u32StreamBufCnt = buffer_count;
     venc_attr.stVencAttr.u32BufSize = mb_pic_cal.u32MBSize;
 
     // set h264 struct props
@@ -111,10 +115,15 @@ unsigned int init_venc(int channel_id, unsigned int width, unsigned int height, 
         errno = ret;
         perror("mpi venc channel create error");
         RK_MPI_SYS_Exit();
-        return MB_INVALID_POOLID;
+        return -1;
     }
     printf("mpi venc channel create ok\n");
 
+    return 0;
+}
+
+unsigned int init_venc_memory(unsigned int buffer_count, MB_PIC_CAL_S mb_pic_cal)
+{
     // init memory pool
     MB_POOL_CONFIG_S memory_pool_config;
     memset(&memory_pool_config, 0, sizeof(MB_POOL_CONFIG_S));
@@ -128,8 +137,6 @@ unsigned int init_venc(int channel_id, unsigned int width, unsigned int height, 
     {
         errno = -1;
         perror("mpi memory pool create error");
-        RK_MPI_VENC_DestroyChn(channel_id);
-        RK_MPI_SYS_Exit();
         return MB_INVALID_POOLID;
     }
     printf("mpi memory pool create ok\n");
@@ -411,6 +418,8 @@ typedef struct
     int video_fd;
     unsigned int width;
     unsigned int height;
+    unsigned int vir_width;
+    unsigned int vir_height;
 
     int venc_channel_id;
 } input_args_t;
@@ -563,11 +572,10 @@ int main()
     signal(SIGTERM, main_stop);
 
     // init venc
-    unsigned int memory_pool = init_venc(VENC_CHANNEL, VIDEO_WIDTH, VIDEO_HEIGHT, BIT_RATE, GOP, BUFFER_COUNT);
-    if (memory_pool == MB_INVALID_POOLID)
-    {
-        return -1;
-    }
+    MB_PIC_CAL_S cal;
+    calculate_venc(VIDEO_WIDTH, VIDEO_HEIGHT, &cal);
+    init_venc(VENC_CHANNEL, VIDEO_WIDTH, VIDEO_HEIGHT, BIT_RATE, GOP, BUFFER_COUNT, cal);
+    unsigned int memory_pool = init_venc_memory(VENC_CHANNEL, cal);
 
     // init v4l2
     int video_fd = init_v4l2(VIDEO_PATH, VIDEO_WIDTH, VIDEO_HEIGHT);
