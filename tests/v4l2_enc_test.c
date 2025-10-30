@@ -35,6 +35,11 @@
 
 #define OUPUT_PATH "data/frame.h264"
 
+unsigned int stride_size(unsigned int size)
+{
+    return (size + 15) & (~15);
+}
+
 int save_data(void *data, unsigned int size)
 {
     FILE *f = fopen(OUPUT_PATH, "wb");
@@ -65,7 +70,7 @@ int calculate_venc(unsigned int width, unsigned int height, MB_PIC_CAL_S *mb_pic
     memset(mb_pic_cal, 0, sizeof(MB_PIC_CAL_S));
     pic_buf_attr.u32Width = width;
     pic_buf_attr.u32Height = height;
-    pic_buf_attr.enPixelFormat = RK_FMT_YUV422_YUYV;
+    pic_buf_attr.enPixelFormat = RK_FMT_YUV420SP;
 
     int32_t ret = RK_MPI_CAL_COMM_GetPicBufferSize(&pic_buf_attr, mb_pic_cal);
     if (ret == -1)
@@ -74,7 +79,7 @@ int calculate_venc(unsigned int width, unsigned int height, MB_PIC_CAL_S *mb_pic
         perror("mpi calcualte error");
         return -1;
     }
-    printf("mpi calculate ok %d\n", mb_pic_cal->u32MBSize);
+    printf("mpi calculate ok %d %d %d\n", mb_pic_cal->u32VirWidth, mb_pic_cal->u32VirHeight, mb_pic_cal->u32MBSize);
 
     return 0;
 }
@@ -94,8 +99,8 @@ int init_venc(int channel_id, unsigned int width, unsigned int height, unsigned 
     memset(&venc_attr, 0, sizeof(venc_attr));
 
     // set h264
-    venc_attr.stVencAttr.enType = RK_VIDEO_ID_AVC;           // 8 h264 9 mjpeg 12 h265 15 jpeg
-    venc_attr.stVencAttr.enPixelFormat = RK_FMT_YUV422_YUYV; // 0 nv12
+    venc_attr.stVencAttr.enType = RK_VIDEO_ID_AVC;        // 8 h264 9 mjpeg 12 h265 15 jpeg
+    venc_attr.stVencAttr.enPixelFormat = RK_FMT_YUV420SP; // 0 nv12
     venc_attr.stVencAttr.u32Profile = H264E_PROFILE_MAIN;
     venc_attr.stVencAttr.u32PicWidth = width;
     venc_attr.stVencAttr.u32PicHeight = height;
@@ -105,9 +110,9 @@ int init_venc(int channel_id, unsigned int width, unsigned int height, unsigned 
     venc_attr.stVencAttr.u32BufSize = mb_pic_cal.u32MBSize;
 
     // set h264 struct props
-    venc_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264VBR;
-    venc_attr.stRcAttr.stH264Vbr.u32BitRate = bit_rate;
-    venc_attr.stRcAttr.stH264Vbr.u32Gop = gop;
+    venc_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264CBR;
+    venc_attr.stRcAttr.stH264Cbr.u32BitRate = bit_rate;
+    venc_attr.stRcAttr.stH264Cbr.u32Gop = gop;
 
     ret = RK_MPI_VENC_CreateChn(channel_id, &venc_attr);
     if (ret != RK_SUCCESS)
@@ -245,8 +250,8 @@ int init_v4l2(const char *path, unsigned int width, unsigned int height)
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
     fmt.fmt.pix_mp.width = width;
     fmt.fmt.pix_mp.height = height;
-    fmt.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_YUYV;
-    fmt.fmt.pix_mp.field = V4L2_FIELD_ANY;
+    fmt.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12;
+    fmt.fmt.pix_mp.field = V4L2_FIELD_NONE;
     // fmt.fmt.pix_mp.num_planes = 1;
 
     // fmt.fmt.pix_mp.plane_fmt[0].bytesperline = width;
@@ -472,7 +477,7 @@ void *input(void *arg)
         frame.stVFrame.u32Height = args->height;
         frame.stVFrame.u32VirWidth = args->width;
         frame.stVFrame.u32VirHeight = args->height;
-        frame.stVFrame.enPixelFormat = RK_FMT_YUV422_YUYV;
+        frame.stVFrame.enPixelFormat = RK_FMT_YUV420SP;
 
         frame.stVFrame.u32TimeRef = buf.sequence;
         frame.stVFrame.u64PTS = time_to_us(buf.timestamp);
@@ -522,6 +527,9 @@ void *output(void *arg)
         {
             errno = ret;
             perror("mpi venc get stream error");
+
+            keep_running = false;
+
             continue;
         }
         printf("mpi venc get stream ok %d %d\n", stream.u32Seq, stream.pstPack->u64PTS);
@@ -536,7 +544,7 @@ void *output(void *arg)
         keep_running = false;
 
         // release stream
-        ret = RK_MPI_VENC_ReleaseStream(VENC_CHANNEL, &stream);
+        ret = RK_MPI_VENC_ReleaseStream(args->venc_channel_id, &stream);
         if (ret != RK_SUCCESS)
         {
             errno = ret;
@@ -573,7 +581,13 @@ int main()
 
     // init venc
     MB_PIC_CAL_S cal;
-    calculate_venc(VIDEO_WIDTH, VIDEO_HEIGHT, &cal);
+    // 1920 1080 will be 1920 1088
+    // calculate_venc(VIDEO_WIDTH, VIDEO_HEIGHT, &cal);
+    cal.u32VirWidth = VIDEO_WIDTH;
+    cal.u32VirHeight = VIDEO_HEIGHT;
+    cal.u32MBSize = VIDEO_WIDTH * VIDEO_HEIGHT * 3 / 2;
+    printf("manual calculate ok %d %d %d\n", cal.u32VirWidth, cal.u32VirHeight, cal.u32MBSize);
+
     // i dont know why 8
     init_venc(VENC_CHANNEL, VIDEO_WIDTH, VIDEO_HEIGHT, BIT_RATE, GOP, 8, cal);
 
