@@ -330,7 +330,13 @@ int stop_v4l2(int fd)
     return 0;
 }
 
-int init_buffers(int video_fd, unsigned int memory_pool, unsigned int buffer_count)
+typedef struct
+{
+    void *block;
+    struct v4l2_plane plane;
+} buffer_t;
+
+int init_buffers(int video_fd, unsigned int memory_pool, unsigned int buffer_count, void *blocks[])
 {
     for (unsigned int i = 0; i < buffer_count; i += 1)
     {
@@ -355,8 +361,8 @@ int init_buffers(int video_fd, unsigned int memory_pool, unsigned int buffer_cou
         printf("video device query buffer %d ok\n", i);
 
         // get mpi block
-        MB_BLK block = RK_MPI_MB_GetMB(memory_pool, plane.length, RK_TRUE);
-        if (block == RK_NULL)
+        blocks[i] = RK_MPI_MB_GetMB(memory_pool, plane.length, RK_TRUE);
+        if (blocks[i] == RK_NULL)
         {
             errno = -1;
             perror("mpi memory get block error");
@@ -364,7 +370,7 @@ int init_buffers(int video_fd, unsigned int memory_pool, unsigned int buffer_cou
         }
         printf("mpi memory get block %d ok\n", i);
 
-        int block_fd = RK_MPI_MB_Handle2Fd(block);
+        int block_fd = RK_MPI_MB_Handle2Fd(blocks[i]);
         if (block_fd == -1)
         {
             errno = -1;
@@ -387,35 +393,11 @@ int init_buffers(int video_fd, unsigned int memory_pool, unsigned int buffer_cou
     return 0;
 }
 
-int release_buffers(int video_fd, unsigned int buffer_count)
+int release_buffers(unsigned int buffer_count, void *buffers[])
 {
     for (unsigned int i = 0; i < buffer_count; i += 1)
     {
-        struct v4l2_buffer buf;
-        struct v4l2_plane plane;
-
-        memset(&buf, 0, sizeof(buf));
-        memset(&plane, 0, sizeof(plane));
-        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-        buf.memory = V4L2_MEMORY_DMABUF;
-        buf.length = 1;
-        buf.m.planes = &plane;
-
-        if (ioctl(video_fd, VIDIOC_DQBUF, &buf) == -1)
-        {
-            perror("video device dequeue buffer error");
-            continue;
-        }
-
-        MB_BLK block = RK_MPI_MMZ_Fd2Handle(plane.m.fd);
-        if (block == NULL)
-        {
-            errno = -1;
-            perror("null block");
-            continue;
-        }
-
-        int ret = RK_MPI_MB_ReleaseMB(block);
+        int ret = RK_MPI_MB_ReleaseMB(buffers[i]);
         if (ret != RK_SUCCESS)
         {
             errno = ret;
@@ -585,7 +567,8 @@ int main()
 
     // init buffers
     unsigned int memory_pool = init_venc_memory(buffer_count, size);
-    init_buffers(video_fd, memory_pool, buffer_count);
+    void *blocks[BUFFER_COUNT];
+    init_buffers(video_fd, memory_pool, buffer_count, blocks);
 
     // start venc
     start_venc(VENC_CHANNEL);
@@ -622,7 +605,7 @@ int main()
     stop_venc(VENC_CHANNEL);
 
     // release buffer
-    release_buffers(video_fd, BUFFER_COUNT);
+    release_buffers(BUFFER_COUNT, blocks);
 
     // close v4l2
     close_v4l2(video_fd);
