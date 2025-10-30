@@ -2,6 +2,10 @@
 
 This is video project in luckfox for kvvm.
 
+## Doc
+
+https://cdn.static.spotpear.cn/uploads/picture/learn/risc-v/luck-fox-pico/Document/Rockchip_Developer_Guide_MPI_FAQ.pdf
+
 ## Toolchain
 
 The toolchain is not included in this project. See `https://github.com/ZCdigitals/kvvm-ai-builder`
@@ -19,7 +23,7 @@ docker run -it --rm -v .:/app builder:luckfox-pico /app/build.sh
 
 Lib files are copied from `luckfox-pico`.
 
-- `libs/rockit`, copied from `<path to luckfox-pico>/media/rockit/out`
+-   `libs/rockit`, copied from `<path to luckfox-pico>/media/rockit/out`
 
 ## Utils
 

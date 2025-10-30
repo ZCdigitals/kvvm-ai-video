@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 project(video C)
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+
 option(BUILD_ENC_TEST "build enc test" OFF)
 option(BUILD_V4L2_TEST "build V4L2 test" OFF)
 option(BUILD_UNIT_SOCKET_TEST "build unit socket test" OFF)
@@ -13,6 +15,7 @@ include_directories(
 
 if(BUILD_ENC_TEST OR BUILD_UNIT_V4L2_ENC_TEST OR BUILD_MAIN)
     # find lib
+    find_package(Threads REQUIRED)
     find_library(ROCKIT_LIB
         NAMES rockit librockit.so librockit.a
         REQUIRED
@@ -84,11 +87,13 @@ if(BUILD_UNIT_V4L2_ENC_TEST)
     add_executable(
         v4l2_enc_test
         "tests/v4l2_enc_test.c"
+        "src/utils.c"
     )
-    # target_include_directories(unit_v4l2_enc_test PRIVATE
-    #     ${PROJECT_SOURCE_DIR}/src
-    # )
+    target_include_directories(v4l2_enc_test PRIVATE
+        ${PROJECT_SOURCE_DIR}/src
+    )
     target_link_libraries(v4l2_enc_test PRIVATE
+        Threads::Threads
         ${ROCKIT_LIB}
         ${ROCKCHIP_MPP_LIB}
         ${RGA_LIB}

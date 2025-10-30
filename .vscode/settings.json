@@ -32,6 +32,9 @@
         "functional": "c",
         "tuple": "c",
         "type_traits": "c",
-        "utility": "c"
+        "utility": "c",
+        "video.h": "c",
+        "signal.h": "c",
+        "rk_comm_mb.h": "c"
     }
 }
