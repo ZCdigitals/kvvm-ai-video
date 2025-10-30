@@ -94,8 +94,8 @@ int init_venc(int channel_id, unsigned int width, unsigned int height, unsigned 
     memset(&venc_attr, 0, sizeof(venc_attr));
 
     // set h264
-    venc_attr.stVencAttr.enType = RK_VIDEO_ID_AVC;
-    venc_attr.stVencAttr.enPixelFormat = RK_FMT_YUV422_YUYV;
+    venc_attr.stVencAttr.enType = RK_VIDEO_ID_AVC;           // 8 h264 9 mjpeg 12 h265 15 jpeg
+    venc_attr.stVencAttr.enPixelFormat = RK_FMT_YUV422_YUYV; // 0 nv12
     venc_attr.stVencAttr.u32Profile = H264E_PROFILE_MAIN;
     venc_attr.stVencAttr.u32PicWidth = width;
     venc_attr.stVencAttr.u32PicHeight = height;
@@ -106,8 +106,8 @@ int init_venc(int channel_id, unsigned int width, unsigned int height, unsigned 
 
     // set h264 struct props
     venc_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264VBR;
-    venc_attr.stRcAttr.stH264Cbr.u32BitRate = bit_rate;
-    venc_attr.stRcAttr.stH264Cbr.u32Gop = gop;
+    venc_attr.stRcAttr.stH264Vbr.u32BitRate = bit_rate;
+    venc_attr.stRcAttr.stH264Vbr.u32Gop = gop;
 
     ret = RK_MPI_VENC_CreateChn(channel_id, &venc_attr);
     if (ret != RK_SUCCESS)
@@ -574,14 +574,15 @@ int main()
     // init venc
     MB_PIC_CAL_S cal;
     calculate_venc(VIDEO_WIDTH, VIDEO_HEIGHT, &cal);
-    init_venc(VENC_CHANNEL, VIDEO_WIDTH, VIDEO_HEIGHT, BIT_RATE, GOP, BUFFER_COUNT, cal);
-    unsigned int memory_pool = init_venc_memory(VENC_CHANNEL, cal);
+    // i dont know why 8
+    init_venc(VENC_CHANNEL, VIDEO_WIDTH, VIDEO_HEIGHT, BIT_RATE, GOP, 8, cal);
 
     // init v4l2
     int video_fd = init_v4l2(VIDEO_PATH, VIDEO_WIDTH, VIDEO_HEIGHT);
     unsigned int buffer_count = init_v4l2_buffers(video_fd, BUFFER_COUNT);
 
     // init buffers
+    unsigned int memory_pool = init_venc_memory(buffer_count, cal);
     void *blocks[BUFFER_COUNT];
     init_buffers(video_fd, memory_pool, buffer_count, blocks);
 
