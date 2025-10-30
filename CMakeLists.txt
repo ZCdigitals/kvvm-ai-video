@@ -82,13 +82,13 @@ if(BUILD_UNIT_V4L2_ENC_TEST)
 
 
     add_executable(
-        ee
-        "tests/ee.c"
+        v4l2_enc_test
+        "tests/v4l2_enc_test.c"
     )
     # target_include_directories(unit_v4l2_enc_test PRIVATE
     #     ${PROJECT_SOURCE_DIR}/src
     # )
-    target_link_libraries(ee PRIVATE
+    target_link_libraries(v4l2_enc_test PRIVATE
         ${ROCKIT_LIB}
         ${ROCKCHIP_MPP_LIB}
         ${RGA_LIB}

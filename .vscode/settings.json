@@ -26,6 +26,12 @@
         "mman.h": "c",
         "string.h": "c",
         "errno.h": "c",
-        "rk_mpi_cal.h": "c"
+        "rk_mpi_cal.h": "c",
+        "array": "c",
+        "compare": "c",
+        "functional": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c"
     }
 }
