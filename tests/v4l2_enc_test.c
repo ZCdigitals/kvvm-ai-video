@@ -57,8 +57,21 @@ int save_data(void *data, unsigned int size)
  */
 static volatile bool keep_running = true;
 
-unsigned int calculate_mpi_size(unsigned int width, unsigned int height)
+unsigned int init_venc(int channel_id, unsigned int width, unsigned int height, unsigned int bit_rate, unsigned int gop, unsigned int buffer_count)
 {
+    int32_t ret = RK_MPI_SYS_Init();
+    if (ret != RK_SUCCESS)
+    {
+        errno = ret;
+        perror("mpi init error");
+        return MB_INVALID_POOLID;
+    }
+    printf("mpi init ok\n");
+
+    VENC_CHN_ATTR_S venc_attr;
+    memset(&venc_attr, 0, sizeof(venc_attr));
+
+    // calculate
     PIC_BUF_ATTR_S pic_buf_attr;
     MB_PIC_CAL_S mb_pic_cal;
     memset(&pic_buf_attr, 0, sizeof(PIC_BUF_ATTR_S));
@@ -72,38 +85,23 @@ unsigned int calculate_mpi_size(unsigned int width, unsigned int height)
     {
         errno = ret;
         perror("mpi calcualte error");
-        return 0;
+        return MB_INVALID_POOLID;
     }
-
-    return mb_pic_cal.u32MBSize;
-}
-
-int init_venc(int channel_id, unsigned int width, unsigned int height, unsigned int bit_rate, unsigned int gop, unsigned int size)
-{
-    int32_t ret = RK_MPI_SYS_Init();
-    if (ret != RK_SUCCESS)
-    {
-        errno = ret;
-        perror("mpi init error");
-        return -1;
-    }
-    printf("mpi init ok\n");
-
-    VENC_CHN_ATTR_S venc_attr;
-    memset(&venc_attr, 0, sizeof(venc_attr));
+    printf("mpi calculate ok %d\n", mb_pic_cal.u32MBSize);
 
     // set h264
     venc_attr.stVencAttr.enType = RK_VIDEO_ID_AVC;
+    venc_attr.stVencAttr.enPixelFormat = RK_FMT_YUV422_YUYV;
     venc_attr.stVencAttr.u32Profile = H264E_PROFILE_MAIN;
     venc_attr.stVencAttr.u32PicWidth = width;
     venc_attr.stVencAttr.u32PicHeight = height;
-    venc_attr.stVencAttr.u32VirWidth = width;
-    venc_attr.stVencAttr.u32VirHeight = height;
-    venc_attr.stVencAttr.u32StreamBufCnt = 8;
-    venc_attr.stVencAttr.u32BufSize = size;
+    venc_attr.stVencAttr.u32VirWidth = mb_pic_cal.u32VirWidth;
+    venc_attr.stVencAttr.u32VirHeight = mb_pic_cal.u32VirHeight;
+    venc_attr.stVencAttr.u32StreamBufCnt = 3;
+    venc_attr.stVencAttr.u32BufSize = mb_pic_cal.u32MBSize;
 
     // set h264 struct props
-    venc_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264CBR;
+    venc_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264VBR;
     venc_attr.stRcAttr.stH264Cbr.u32BitRate = bit_rate;
     venc_attr.stRcAttr.stH264Cbr.u32Gop = gop;
 
@@ -112,19 +110,15 @@ int init_venc(int channel_id, unsigned int width, unsigned int height, unsigned 
     {
         errno = ret;
         perror("mpi venc channel create error");
-        return -1;
+        RK_MPI_SYS_Exit();
+        return MB_INVALID_POOLID;
     }
     printf("mpi venc channel create ok\n");
 
-    return 0;
-}
-
-unsigned int init_venc_memory(unsigned int buffer_count, unsigned long long int size)
-{
     // init memory pool
     MB_POOL_CONFIG_S memory_pool_config;
     memset(&memory_pool_config, 0, sizeof(MB_POOL_CONFIG_S));
-    memory_pool_config.u64MBSize = size;
+    memory_pool_config.u64MBSize = mb_pic_cal.u32MBSize;
     memory_pool_config.u32MBCnt = buffer_count;
     memory_pool_config.enAllocType = MB_ALLOC_TYPE_DMA;
     memory_pool_config.bPreAlloc = RK_TRUE;
@@ -134,6 +128,8 @@ unsigned int init_venc_memory(unsigned int buffer_count, unsigned long long int 
     {
         errno = -1;
         perror("mpi memory pool create error");
+        RK_MPI_VENC_DestroyChn(channel_id);
+        RK_MPI_SYS_Exit();
         return MB_INVALID_POOLID;
     }
     printf("mpi memory pool create ok\n");
@@ -307,10 +303,10 @@ int start_v4l2(int fd)
     type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
     if (ioctl(fd, VIDIOC_STREAMON, &type) == -1)
     {
-        perror("video device start streaming error");
+        perror("video device start stream error");
         return -1;
     }
-    printf("video device start streaming ok\n");
+    printf("video device start stream ok\n");
 
     return 0;
 }
@@ -423,12 +419,8 @@ void *input(void *arg)
 {
     input_args_t *args = (input_args_t *)arg;
 
-    unsigned int frame_num = 0;
-
     while (keep_running)
     {
-        keep_running = false;
-
         struct v4l2_buffer buf;
         struct v4l2_plane plane;
 
@@ -444,7 +436,7 @@ void *input(void *arg)
             perror("video device dequeue buffer error");
             continue;
         }
-        printf("video device dequeue buffer %d %d ok\n", buf.index, buf.sequence);
+        printf("video device dequeue buffer %d %d %d ok\n", buf.index, buf.sequence, plane.bytesused);
 
         MB_BLK block = RK_MPI_MMZ_Fd2Handle(plane.m.fd);
         // check block
@@ -488,7 +480,12 @@ void *input(void *arg)
         }
         printf("mpi venc send frame ok\n");
 
-        frame_num += 1;
+        if (ioctl(args->video_fd, VIDIOC_QBUF, &buf) == -1)
+        {
+            perror("video device requeue buffer error");
+            continue;
+        }
+        printf("video device requeue buffer %d ok\n", buf.index);
     }
 
     return NULL;
@@ -503,13 +500,15 @@ void *output(void *arg)
 {
     output_args_t *args = (output_args_t *)arg;
 
+    VENC_STREAM_S stream;
+    stream.pstPack = malloc(sizeof(VENC_PACK_S));
+
     while (keep_running)
     {
         // get stream
-        VENC_STREAM_S stream;
-        stream.pstPack = malloc(sizeof(VENC_PACK_S));
+        printf("mpi venc get stream start\n");
 
-        int ret = RK_MPI_VENC_GetStream(args->venc_channel_id, &stream, 1000);
+        int ret = RK_MPI_VENC_GetStream(args->venc_channel_id, &stream, TIMEOUT);
         if (ret != RK_SUCCESS)
         {
             errno = ret;
@@ -518,13 +517,14 @@ void *output(void *arg)
         }
         printf("mpi venc get stream ok %d %d\n", stream.u32Seq, stream.pstPack->u64PTS);
 
-        void *dst;
         unsigned int size = stream.pstPack->u32Len;
         // read to destnation
-        dst = RK_MPI_MB_Handle2VirAddr(stream.pstPack->pMbBlk);
+        void *dst = RK_MPI_MB_Handle2VirAddr(stream.pstPack->pMbBlk);
 
         // save
         save_data(dst, size);
+
+        keep_running = false;
 
         // release stream
         ret = RK_MPI_VENC_ReleaseStream(VENC_CHANNEL, &stream);
@@ -540,6 +540,11 @@ void *output(void *arg)
         if (stream.pstPack->bStreamEnd == RK_TRUE)
         {
             break;
+        }
+
+        if (stream.pstPack)
+        {
+            free(stream.pstPack);
         }
     }
 
@@ -558,15 +563,17 @@ int main()
     signal(SIGTERM, main_stop);
 
     // init venc
-    unsigned int size = calculate_mpi_size(VIDEO_WIDTH, VIDEO_HEIGHT);
-    init_venc(VENC_CHANNEL, VIDEO_WIDTH, VIDEO_HEIGHT, BIT_RATE, GOP, size);
+    unsigned int memory_pool = init_venc(VENC_CHANNEL, VIDEO_WIDTH, VIDEO_HEIGHT, BIT_RATE, GOP, BUFFER_COUNT);
+    if (memory_pool == MB_INVALID_POOLID)
+    {
+        return -1;
+    }
 
     // init v4l2
     int video_fd = init_v4l2(VIDEO_PATH, VIDEO_WIDTH, VIDEO_HEIGHT);
     unsigned int buffer_count = init_v4l2_buffers(video_fd, BUFFER_COUNT);
 
     // init buffers
-    unsigned int memory_pool = init_venc_memory(buffer_count, size);
     void *blocks[BUFFER_COUNT];
     init_buffers(video_fd, memory_pool, buffer_count, blocks);
 
@@ -577,8 +584,8 @@ int main()
     start_v4l2(video_fd);
 
     // threads
-    // pthread_t input_thread;
-    // pthread_t output_thread;
+    pthread_t input_thread;
+    pthread_t output_thread;
 
     input_args_t input_args = {
         .video_fd = video_fd,
@@ -591,12 +598,12 @@ int main()
         .venc_channel_id = VENC_CHANNEL,
     };
 
-    // pthread_create(&input_thread, NULL, input, &input_args);
-    // pthread_create(&output_thread, NULL, output, &outpu_args);
+    pthread_create(&input_thread, NULL, input, &input_args);
+    pthread_create(&output_thread, NULL, output, &outpu_args);
 
-    // // wait thread end
-    // pthread_join(input_thread, NULL);
-    // pthread_join(output_thread, NULL);
+    // wait thread end
+    pthread_join(input_thread, NULL);
+    pthread_join(output_thread, NULL);
 
     // stop v4l2
     stop_v4l2(video_fd);
