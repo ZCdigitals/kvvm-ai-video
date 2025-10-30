@@ -189,7 +189,7 @@ int capture_v4l2_frame(unsigned int *id, unsigned long long int *time)
 
     buffer = &buf;
     *id = buf.sequence;
-    *time = sec_to_us(&buf.timestamp);
+    *time = time_to_us(buf.timestamp);
 
     return plane.m.fd;
 }

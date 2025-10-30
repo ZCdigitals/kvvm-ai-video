@@ -6,12 +6,12 @@
 #define US_PER_SECOND 1000000
 
 /**
- * second to us
+ * time to us
  *
  * @param tv time
  * @return time in us
  */
-unsigned long long int sec_to_us(struct timeval *tv);
+unsigned long long int time_to_us(struct timeval tv);
 
 /**
  * get time in us
