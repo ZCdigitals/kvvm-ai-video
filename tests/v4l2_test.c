@@ -1,82 +1,96 @@
-#include <fcntl.h>
-#include <linux/videodev2.h>
+#include <errno.h>
+#include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
+#include <linux/videodev2.h>
+
+#include <fcntl.h>
+
 #define BUFFER_COUNT 4
-
-struct buffer_plane
-{
-    void *start;
-    size_t length;
-};
-
-struct buffer
-{
-    struct buffer_plane planes[VIDEO_MAX_PLANES];
-    int n_planes;
-};
-
-static int fd = -1;
-static struct buffer *buffers = NULL;
-static unsigned int n_buffers = 0;
 
 #define VIDEO_PATH "/dev/video0"
 #define VIDEO_WIDTH 1920
-#define VIDEO_HEIGHT 1080
+#define VIDEO_HEIGHT 1088
 #define OUTPUT_PATH "data/frame.raw"
 
-int save_data_nv12(const char *path, void *data_y, size_t size_y, void *data_uv, size_t size_uv)
+int save_data(void *data, size_t size)
 {
-    FILE *fp = fopen(path, "wb");
-    if (!fp)
+    FILE *f = fopen(OUTPUT_PATH, "wb");
+    if (f == NULL)
     {
-        perror("file open error");
+        perror("save data file open error");
         return -1;
     }
 
-    fwrite(data_y, 1, size_y, fp);
-    fwrite(data_uv, 1, size_uv, fp);
+    fwrite(data, 1, size, f);
+    fflush(f);
 
-    fclose(fp);
-    printf("file save %s\n", path);
+    fclose(f);
+
     return 0;
+}
+
+typedef struct
+{
+    void *start;
+    size_t length;
+} buffer_plane;
+
+/**
+ * running
+ */
+static volatile bool keep_running = true;
+
+void main_stop()
+{
+    keep_running = false;
 }
 
 int main()
 {
+    // regist signal
+    signal(SIGINT, main_stop);
+    signal(SIGTERM, main_stop);
+
     struct v4l2_capability cap;
 
-    fd = open(VIDEO_PATH, O_RDWR);
+    int fd = open(VIDEO_PATH, O_RDWR);
     if (fd == -1)
     {
         perror("video device open error");
-        return -1;
+        return 0;
     }
+    printf("video device open ok\n");
 
     // check device capabilities
     if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == -1)
     {
         perror("video device query capabilities error");
         close(fd);
-        return -1;
+        return 0;
     }
+    printf("video device query capabilities ok\n");
 
     if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE_MPLANE))
     {
-        perror("video device not support multi plane");
+        perror("video device not support capture multiple plane");
         close(fd);
-        return -1;
+        return 0;
     }
+    printf("video device support capture multiple plane\n");
 
     if (!(cap.capabilities & V4L2_CAP_STREAMING))
     {
         perror("video device not support streaming");
         close(fd);
-        return -1;
+        return 0;
     }
+    printf("video device support streaming\n");
 
     // setup start
     struct v4l2_format fmt;
@@ -87,24 +101,24 @@ int main()
     fmt.fmt.pix_mp.height = VIDEO_HEIGHT;
     fmt.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12;
     fmt.fmt.pix_mp.field = V4L2_FIELD_NONE;
-    fmt.fmt.pix_mp.num_planes = 2;
+    // fmt.fmt.pix_mp.num_planes = 1;
 
-    fmt.fmt.pix_mp.plane_fmt[0].bytesperline = VIDEO_WIDTH;
-    fmt.fmt.pix_mp.plane_fmt[0].sizeimage = VIDEO_WIDTH * VIDEO_HEIGHT;
-    fmt.fmt.pix_mp.plane_fmt[1].bytesperline = VIDEO_WIDTH;
-    fmt.fmt.pix_mp.plane_fmt[1].sizeimage = VIDEO_WIDTH * VIDEO_HEIGHT / 2;
+    // fmt.fmt.pix_mp.plane_fmt[0].bytesperline = width;
+    // fmt.fmt.pix_mp.plane_fmt[0].sizeimage = width * height;
+    // fmt.fmt.pix_mp.plane_fmt[1].bytesperline = width;
+    // fmt.fmt.pix_mp.plane_fmt[1].sizeimage = width * height / 2;
 
     if (ioctl(fd, VIDIOC_S_FMT, &fmt) == -1)
     {
         perror("video device set format error");
         close(fd);
-        return -1;
+        return 0;
     }
+    printf("video device set format ok\n");
     // setup end
 
-    // init mmap start
+    // init memory
     struct v4l2_requestbuffers req;
-
     memset(&req, 0, sizeof(req));
     req.count = BUFFER_COUNT;
     req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
@@ -113,129 +127,100 @@ int main()
     if (ioctl(fd, VIDIOC_REQBUFS, &req) == -1)
     {
         perror("video device request buffer error");
-        close(fd);
-        return -1;
+        return 0;
     }
+    printf("video device request buffer ok\n");
+
+    if (!(req.capabilities & V4L2_BUF_CAP_SUPPORTS_DMABUF))
+    {
+        perror("video buffers not support dma");
+        return 0;
+    }
+    printf("video buffers support dma\n");
 
     if (req.count < 2)
     {
-        perror("video device buffer count not enough");
-        close(fd);
-        return -1;
+        perror("video buffers count not enough");
+        return 0;
     }
+    printf("video buffers count %d\n", req.count);
 
-    n_buffers = req.count;
-    buffers = calloc(req.count, sizeof(*buffers));
-    if (!buffers)
-    {
-        perror("video device calloc buffers error");
-        close(fd);
-        return -1;
-    }
-
-    for (unsigned int i = 0; i < n_buffers; i++)
+    buffer_plane planes[VIDEO_MAX_PLANES];
+    for (unsigned int i = 0; i < req.count; i += 1)
     {
         struct v4l2_buffer buf;
-        struct v4l2_plane planes[VIDEO_MAX_PLANES];
+        struct v4l2_plane plane;
 
         memset(&buf, 0, sizeof(buf));
-        memset(planes, 0, sizeof(planes));
+        memset(&plane, 0, sizeof(plane));
         buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
         buf.memory = V4L2_MEMORY_MMAP;
         buf.index = i;
-        buf.length = VIDEO_MAX_PLANES;
-        buf.m.planes = planes;
+        buf.length = 1;
+        buf.m.planes = &plane;
 
         if (ioctl(fd, VIDIOC_QUERYBUF, &buf) == -1)
         {
-            perror("video device query buffer error");
+            perror("video device qeury buffer error");
             close(fd);
             return -1;
         }
 
-        buffers[i].n_planes = buf.length;
-
-        for (unsigned int j = 0; j < buf.length; j++)
+        planes[i].length = plane.length;
+        planes[i].start = mmap(NULL,
+                               plane.length,
+                               PROT_READ | PROT_WRITE, MAP_SHARED,
+                               fd,
+                               plane.m.mem_offset);
+        if (planes[i].start == MAP_FAILED)
         {
-            buffers[i].planes[j].length = buf.m.planes[j].length;
-            buffers[i].planes[j].start = mmap(NULL, buf.m.planes[j].length,
-                                              PROT_READ | PROT_WRITE, MAP_SHARED,
-                                              fd, buf.m.planes[j].m.mem_offset);
-            if (MAP_FAILED == buffers[i].planes[j].start)
-            {
-                perror("video device set plane buffer error");
-                close(fd);
-                return -1;
-            }
-        }
-    }
-    // init mmap end
-
-    // start capture
-    for (unsigned int i = 0; i < n_buffers; i++)
-    {
-        struct v4l2_buffer buf;
-        struct v4l2_plane planes[VIDEO_MAX_PLANES];
-
-        memset(&buf, 0, sizeof(buf));
-        memset(planes, 0, sizeof(planes));
-        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-        buf.memory = V4L2_MEMORY_MMAP;
-        buf.index = i;
-        buf.length = buffers[i].n_planes;
-        buf.m.planes = planes;
-
-        if (ioctl(fd, VIDIOC_QBUF, &buf) == -1)
-        {
-            perror("video device query buffer error");
+            perror("video device mmap error");
+            close(fd);
             return -1;
         }
     }
 
+    // start
     enum v4l2_buf_type type;
     type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
     if (ioctl(fd, VIDIOC_STREAMON, &type) == -1)
     {
-        perror("video device start streaming error");
+        perror("video device start stream error");
         return -1;
     }
+    printf("video device start stream ok\n");
 
-    // capture
-    void *frame_data_y;
-    size_t frame_size_y;
-    void *frame_data_uv;
-    size_t frame_size_uv;
-
-    struct v4l2_buffer buf;
-    struct v4l2_plane planes[VIDEO_MAX_PLANES];
-
-    memset(&buf, 0, sizeof(buf));
-    memset(planes, 0, sizeof(planes));
-    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-    buf.memory = V4L2_MEMORY_MMAP;
-    buf.length = VIDEO_MAX_PLANES;
-    buf.m.planes = planes;
-
-    if (ioctl(fd, VIDIOC_DQBUF, &buf) == -1)
+    while (keep_running)
     {
-        perror("video device dequeue buffer error");
-        return -1;
+        // input
+        struct v4l2_buffer buf;
+        struct v4l2_plane plane;
+
+        memset(&buf, 0, sizeof(buf));
+        memset(&plane, 0, sizeof(plane));
+        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+        buf.memory = V4L2_MEMORY_MMAP;
+        buf.length = 1;
+        buf.m.planes = &plane;
+
+        if (ioctl(fd, VIDIOC_DQBUF, &buf) == -1)
+        {
+            perror("video device dequeue buffer error");
+            continue;
+        }
+        printf("video device dequeue buffer %d %d %d ok\n", buf.index, buf.sequence, plane.bytesused);
+
+        // save data
+        buffer_plane bp = planes[buf.index];
+        save_data(bp.start, bp.length);
+
+        if (ioctl(fd, VIDIOC_QBUF, &buf) == -1)
+        {
+            perror("video device requeue buffer error");
+            continue;
+        }
+        printf("video device requeue buffer %d ok\n", buf.index);
     }
-
-    frame_data_y = buffers[buf.index].planes[0].start;
-    frame_size_y = buffers[buf.index].planes[0].length;
-    frame_data_uv = buffers[buf.index].planes[1].start;
-    frame_size_uv = buffers[buf.index].planes[1].length;
-
-    // add to queue after processing
-    if (ioctl(fd, VIDIOC_QBUF, &buf) == -1)
-    {
-        perror("video device requeue buffer error");
-        return -1;
-    }
-
-    // save file
-    save_data_nv12(OUTPUT_PATH, frame_data_y, frame_size_y, frame_data_uv, frame_size_uv);
 
     // stop
     if (ioctl(fd, VIDIOC_STREAMOFF, &type) == -1)
@@ -243,29 +228,11 @@ int main()
         perror("video device stop stream error");
         return -1;
     }
+    printf("video device stop stream ok\n");
 
-    if (buffers)
-    {
-        for (unsigned int i = 0; i < n_buffers; i++)
-        {
-            for (unsigned int j = 0; j < buffers[i].n_planes; j++)
-            {
-                if (buffers[i].planes[j].start != MAP_FAILED)
-                {
-                    munmap(buffers[i].planes[j].start, buffers[i].planes[j].length);
-                }
-            }
-        }
-        free(buffers);
-        buffers = NULL;
-        n_buffers = 0;
-    }
-
-    if (fd >= 0)
-    {
-        close(fd);
-        fd = -1;
-    }
+    // close
+    close(fd);
+    printf("video device close ok\n");
 
     return 0;
 }
