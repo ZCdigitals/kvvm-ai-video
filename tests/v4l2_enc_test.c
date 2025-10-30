@@ -33,7 +33,7 @@
 #define VIDEO_PATH "/dev/video0"
 #define BUFFER_COUNT 4
 
-#define OUPUT_PATH "data/frame.h264"
+#define OUTPUT_PATH "data/frame.h264"
 
 unsigned int stride_size(unsigned int size)
 {
@@ -42,7 +42,7 @@ unsigned int stride_size(unsigned int size)
 
 int save_data(void *data, unsigned int size)
 {
-    FILE *f = fopen(OUPUT_PATH, "wb");
+    FILE *f = fopen(OUTPUT_PATH, "wb");
     if (f == NULL)
     {
         perror("save data file open error");
