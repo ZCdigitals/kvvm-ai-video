@@ -37,6 +37,8 @@
         "signal.h": "c",
         "rk_comm_mb.h": "c",
         "string_view": "c",
-        "initializer_list": "c"
+        "initializer_list": "c",
+        "rk_comm_video.h": "c",
+        "pthread.h": "c"
     }
 }

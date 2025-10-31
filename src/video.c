@@ -5,35 +5,184 @@
 #include <string.h>
 
 #include <sys/ioctl.h>
-#include <sys/mman.h>
 
 #include <linux/videodev2.h>
 
-#include <unistd.h>
 #include <fcntl.h>
+#include <unistd.h>
 
-#include "utils.h"
+#include "rk_common.h"
+#include "rk_mpi_cal.h"
+#include "rk_mpi_mb.h"
+#include "rk_mpi_mmz.h"
+#include "rk_mpi_sys.h"
+#include "rk_mpi_venc.h"
+#include "rk_type.h"
 
-static int fd = -1;
+int calculate_venc(unsigned int width, unsigned int height, MB_PIC_CAL_S *mb_pic_cal)
+{
 
-unsigned int init_v4l2(const char *path, int width, int height, unsigned int buffer_count)
+    PIC_BUF_ATTR_S pic_buf_attr;
+    memset(&pic_buf_attr, 0, sizeof(PIC_BUF_ATTR_S));
+    memset(mb_pic_cal, 0, sizeof(MB_PIC_CAL_S));
+    pic_buf_attr.u32Width = width;
+    pic_buf_attr.u32Height = height;
+    pic_buf_attr.enPixelFormat = RK_COLOR;
+
+    int32_t ret = RK_MPI_CAL_COMM_GetPicBufferSize(&pic_buf_attr, mb_pic_cal);
+    if (ret == -1)
+    {
+        errno = ret;
+        perror("mpi calcualte error");
+        return -1;
+    }
+    printf("mpi calculate ok %d %d %d\n", mb_pic_cal->u32VirWidth, mb_pic_cal->u32VirHeight, mb_pic_cal->u32MBSize);
+
+    return 0;
+}
+
+int init_venc(int channel_id, unsigned int width, unsigned int height, unsigned int bit_rate, unsigned int gop, unsigned int buffer_count, MB_PIC_CAL_S mb_pic_cal)
+{
+    int32_t ret = RK_MPI_SYS_Init();
+    if (ret != RK_SUCCESS)
+    {
+        errno = ret;
+        perror("mpi init error");
+        return -1;
+    }
+    printf("mpi init ok\n");
+
+    VENC_CHN_ATTR_S venc_attr;
+    memset(&venc_attr, 0, sizeof(venc_attr));
+
+    // set h264
+    venc_attr.stVencAttr.enType = RK_VIDEO_ID_AVC; // 8 h264 9 mjpeg 12 h265 15 jpeg
+    venc_attr.stVencAttr.enPixelFormat = RK_COLOR;
+    venc_attr.stVencAttr.u32Profile = H264E_PROFILE_MAIN;
+    venc_attr.stVencAttr.u32PicWidth = width;
+    venc_attr.stVencAttr.u32PicHeight = height;
+    venc_attr.stVencAttr.u32VirWidth = mb_pic_cal.u32VirWidth;
+    venc_attr.stVencAttr.u32VirHeight = mb_pic_cal.u32VirHeight;
+    venc_attr.stVencAttr.u32StreamBufCnt = buffer_count;
+    venc_attr.stVencAttr.u32BufSize = mb_pic_cal.u32MBSize;
+
+    // set h264 struct props
+    venc_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264CBR;
+    venc_attr.stRcAttr.stH264Cbr.u32BitRate = bit_rate;
+    venc_attr.stRcAttr.stH264Cbr.u32Gop = gop;
+
+    ret = RK_MPI_VENC_CreateChn(channel_id, &venc_attr);
+    if (ret != RK_SUCCESS)
+    {
+        errno = ret;
+        perror("mpi venc create channel error");
+        RK_MPI_SYS_Exit();
+        return -1;
+    }
+    printf("mpi venc %d create channel ok\n", channel_id);
+
+    return 0;
+}
+
+unsigned int init_venc_memory(unsigned int buffer_count, MB_PIC_CAL_S mb_pic_cal)
+{
+    // init memory pool
+    MB_POOL_CONFIG_S memory_pool_config;
+    memset(&memory_pool_config, 0, sizeof(MB_POOL_CONFIG_S));
+    memory_pool_config.u64MBSize = mb_pic_cal.u32MBSize;
+    memory_pool_config.u32MBCnt = buffer_count;
+    memory_pool_config.enAllocType = MB_ALLOC_TYPE_DMA;
+    memory_pool_config.bPreAlloc = RK_TRUE;
+
+    unsigned int memory_pool_id = RK_MPI_MB_CreatePool(&memory_pool_config);
+    if (memory_pool_id == MB_INVALID_POOLID)
+    {
+        errno = -1;
+        perror("mpi memory pool create error");
+        return MB_INVALID_POOLID;
+    }
+    printf("mpi memory pool %d %d create ok\n", memory_pool_id, buffer_count);
+
+    return memory_pool_id;
+}
+
+void destroy_venc(int channel_id, unsigned int memory_pool_id)
+{
+    int ret = RK_MPI_MB_DestroyPool(memory_pool_id);
+    if (ret != RK_SUCCESS)
+    {
+        errno = ret;
+        perror("mpi memory pool destory error");
+    }
+    printf("mpi memory pool %d destory ok\n", memory_pool_id);
+
+    ret = RK_MPI_VENC_DestroyChn(channel_id);
+    if (ret != RK_SUCCESS)
+    {
+        errno = ret;
+        perror("mpi venc destory error");
+    }
+    printf("mpi venc %d destory ok\n", channel_id);
+
+    ret = RK_MPI_SYS_Exit();
+    if (ret != RK_SUCCESS)
+    {
+        errno = ret;
+        perror("mpi exit error");
+    }
+    printf("mpi exit ok\n");
+}
+
+int start_venc(int channel_id)
+{
+    VENC_RECV_PIC_PARAM_S receive_param;
+    memset(&receive_param, 0, sizeof(VENC_RECV_PIC_PARAM_S));
+    receive_param.s32RecvPicNum = -1;
+    int ret = RK_MPI_VENC_StartRecvFrame(channel_id, &receive_param);
+    if (ret != RK_SUCCESS)
+    {
+        errno = ret;
+        perror("mpi venc start receive frame error");
+        return -1;
+    }
+    printf("mpi venc %d start receive frame ok\n", channel_id);
+
+    return 0;
+}
+
+int stop_venc(int channel_id)
+{
+    int ret = RK_MPI_VENC_StopRecvFrame(channel_id);
+    if (ret != RK_SUCCESS)
+    {
+        errno = ret;
+        perror("mpi venc stop receive frame error");
+        return -1;
+    }
+    printf("mpi venc %d stop receive frame ok\n", channel_id);
+
+    return 0;
+}
+
+int init_v4l2(const char *path, unsigned int width, unsigned int height)
 {
     struct v4l2_capability cap;
 
-    fd = open(path, O_RDWR);
+    int fd = open(path, O_RDWR);
     if (fd == -1)
     {
         perror("video device open error");
-        return 0;
+        return -1;
     }
     printf("video device open ok\n");
 
     // check device capabilities
-    if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == -1)
+    int ret = ioctl(fd, VIDIOC_QUERYCAP, &cap);
+    if (ret == -1)
     {
         perror("video device query capabilities error");
         close(fd);
-        return 0;
+        return -1;
     }
     printf("video device query capabilities ok\n");
 
@@ -41,7 +190,7 @@ unsigned int init_v4l2(const char *path, int width, int height, unsigned int buf
     {
         perror("video device not support capture multiple plane");
         close(fd);
-        return 0;
+        return -1;
     }
     printf("video device support capture multiple plane\n");
 
@@ -49,19 +198,19 @@ unsigned int init_v4l2(const char *path, int width, int height, unsigned int buf
     {
         perror("video device not support streaming");
         close(fd);
-        return 0;
+        return -1;
     }
     printf("video device support streaming\n");
 
-    // setup start
+    // set format
     struct v4l2_format fmt;
 
     memset(&fmt, 0, sizeof(fmt));
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
     fmt.fmt.pix_mp.width = width;
     fmt.fmt.pix_mp.height = height;
-    fmt.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_YUYV;
-    fmt.fmt.pix_mp.field = V4L2_FIELD_ANY;
+    fmt.fmt.pix_mp.pixelformat = V4L2_COLOR;
+    fmt.fmt.pix_mp.field = V4L2_FIELD_NONE;
     // fmt.fmt.pix_mp.num_planes = 1;
 
     // fmt.fmt.pix_mp.plane_fmt[0].bytesperline = width;
@@ -69,18 +218,21 @@ unsigned int init_v4l2(const char *path, int width, int height, unsigned int buf
     // fmt.fmt.pix_mp.plane_fmt[1].bytesperline = width;
     // fmt.fmt.pix_mp.plane_fmt[1].sizeimage = width * height / 2;
 
-    if (ioctl(fd, VIDIOC_S_FMT, &fmt) == -1)
+    ret = ioctl(fd, VIDIOC_S_FMT, &fmt);
+    if (ret == -1)
     {
         perror("video device set format error");
         close(fd);
-        return 0;
+        return -1;
     }
     printf("video device set format ok\n");
-    // setup end
 
-    // init buffers start
+    return fd;
+}
+
+unsigned int init_v4l2_buffers(int fd, unsigned int buffer_count)
+{
     struct v4l2_requestbuffers req;
-
     memset(&req, 0, sizeof(req));
     req.count = buffer_count;
     req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
@@ -89,135 +241,60 @@ unsigned int init_v4l2(const char *path, int width, int height, unsigned int buf
     if (ioctl(fd, VIDIOC_REQBUFS, &req) == -1)
     {
         perror("video device request buffer error");
-        close(fd);
         return 0;
     }
     printf("video device request buffer ok\n");
 
     if (!(req.capabilities & V4L2_BUF_CAP_SUPPORTS_DMABUF))
     {
-        perror("video buffers not support dma");
-        close(fd);
+        perror("video device not support dma");
         return 0;
     }
-    printf("video buffers support dma\n");
+    printf("video device support dma\n");
 
     if (req.count < 2)
     {
-        perror("video buffers count not enough");
-        close(fd);
+        perror("video device buffers count not enough");
         return 0;
     }
-    printf("video buffers count %d\n", req.count);
+    printf("video device buffers count %d\n", req.count);
 
     return req.count;
 }
 
-static struct v4l2_buffer vbuf;
-static struct v4l2_plane vplane;
-
-unsigned int init_v4l2_buffer(unsigned int index)
+void destroy_v4l2(int fd)
 {
-    memset(&vbuf, 0, sizeof(vbuf));
-    memset(&vplane, 0, sizeof(vplane));
-    vbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-    vbuf.memory = V4L2_MEMORY_DMABUF;
-    vbuf.index = index;
-    vbuf.length = 1;
-    vbuf.m.planes = &vplane;
-
-    if (ioctl(fd, VIDIOC_QUERYBUF, &vbuf) == -1)
+    int ret = close(fd);
+    if (ret == -1)
     {
-        perror("video device query buffer error");
-        close(fd);
-        return -1;
+        perror("video device close error");
     }
-    printf("video device query buffer ok\n");
-
-    return vplane.length;
+    printf("video device close ok\n");
 }
 
-int use_v4l2_buffer(int plane_fd)
+int start_v4l2(int fd)
 {
-    vplane.m.fd = plane_fd;
+    enum v4l2_buf_type type;
+    type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
 
-    if (ioctl(fd, VIDIOC_QBUF, &vbuf) == -1)
+    int ret = ioctl(fd, VIDIOC_STREAMON, &type);
+    if (ret == -1)
     {
-        perror("video device queue buffer error");
+        perror("video device start stream error");
         return -1;
     }
-    printf("video device queue buffer ok\n");
+    printf("video device start stream ok\n");
 
     return 0;
 }
 
-int start_v4l2_capture()
+int stop_v4l2(int fd)
 {
     enum v4l2_buf_type type;
     type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-    if (ioctl(fd, VIDIOC_STREAMON, &type) == -1)
-    {
-        perror("video device start streaming error");
-        return -1;
-    }
-    printf("video device start streaming ok\n");
 
-    return 0;
-}
-
-static volatile struct v4l2_buffer *buffer = NULL;
-
-int capture_v4l2_frame(unsigned int *id, unsigned long long int *time)
-{
-    struct v4l2_buffer buf;
-    struct v4l2_plane plane;
-
-    memset(&buf, 0, sizeof(buf));
-    memset(&plane, 0, sizeof(plane));
-    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-    buf.memory = V4L2_MEMORY_DMABUF;
-    buf.length = 1;
-    buf.m.planes = &plane;
-    // plane.m.fd = plane_fd;
-
-    if (ioctl(fd, VIDIOC_DQBUF, &buf) == -1)
-    {
-        perror("video device dequeue buffer error");
-        return -1;
-    }
-    printf("video device dequeue buffer ok\n");
-
-    buffer = &buf;
-    *id = buf.sequence;
-    *time = time_to_us(buf.timestamp);
-
-    return plane.m.fd;
-}
-
-int release_v4l2_frame()
-{
-    if (buffer == NULL)
-    {
-        errno = -1;
-        perror("null buffer, call `capture_v4l2_frame` first");
-        return -1;
-    }
-
-    if (ioctl(fd, VIDIOC_QBUF, buffer) == -1)
-    {
-        perror("video device queue buffer error");
-        close(fd);
-        return -1;
-    }
-    printf("video device queue buffer ok\n");
-}
-
-int stop_v4l2_capture()
-{
-    enum v4l2_buf_type type;
-
-    type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-    if (ioctl(fd, VIDIOC_STREAMOFF, &type) == -1)
+    int ret = ioctl(fd, VIDIOC_STREAMOFF, &type);
+    if (ret == -1)
     {
         perror("video device stop stream error");
         return -1;
@@ -227,12 +304,79 @@ int stop_v4l2_capture()
     return 0;
 }
 
-void close_v4l2()
+int allocate_buffers(unsigned int memory_pool_id, int video_fd, unsigned int buffer_count, void *blocks[])
 {
-    if (fd >= 0)
+    for (unsigned int i = 0; i < buffer_count; i += 1)
     {
-        close(fd);
-        fd = -1;
-        printf("video device close ok\n");
+        // use v4l2 buffer
+        struct v4l2_buffer buf;
+        struct v4l2_plane plane;
+
+        memset(&buf, 0, sizeof(buf));
+        memset(&plane, 0, sizeof(plane));
+        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+        buf.memory = V4L2_MEMORY_DMABUF;
+        buf.index = i;
+        buf.length = 1;
+        buf.m.planes = &plane;
+
+        // although we use dma, query buffer is also necessary, this will init plane
+        int ret = ioctl(video_fd, VIDIOC_QUERYBUF, &buf);
+        if (ret == -1)
+        {
+            perror("video device query buffer error");
+            return -1;
+        }
+        printf("video device query buffer %d ok\n", i);
+
+        // get mpi block
+        blocks[i] = RK_MPI_MB_GetMB(memory_pool_id, plane.length, RK_TRUE);
+        if (blocks[i] == RK_NULL)
+        {
+            errno = -1;
+            perror("mpi memory get block error");
+            return -1;
+        }
+        printf("mpi memory get block %d ok\n", i);
+
+        // get block fd
+        int block_fd = RK_MPI_MB_Handle2Fd(blocks[i]);
+        if (block_fd == -1)
+        {
+            errno = -1;
+            perror("mpi memory get block fd error");
+            return -1;
+        }
+        printf("mpi memory get block %d ok\n", i);
+
+        // set block fd to plane
+        plane.m.fd = block_fd;
+
+        ret = ioctl(video_fd, VIDIOC_QBUF, &buf);
+        if (ret == -1)
+        {
+            perror("video device queue buffer error");
+            return -1;
+        }
+        printf("video device queue buffer %d ok\n", i);
     }
+
+    return 0;
+}
+
+int free_buffers(unsigned int buffer_count, void *blocks[])
+{
+    for (unsigned int i = 0; i < buffer_count; i += 1)
+    {
+        int ret = RK_MPI_MB_ReleaseMB(blocks[i]);
+        if (ret != RK_SUCCESS)
+        {
+            errno = ret;
+            perror("mpi memory release block error");
+            continue;
+        }
+        printf("mpi memory release block ok\n");
+    }
+
+    return 0;
 }
