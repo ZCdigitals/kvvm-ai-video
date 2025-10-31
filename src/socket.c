@@ -96,7 +96,7 @@ int send_frame(int fd, uint32_t id, uint64_t time, uint32_t width, uint32_t heig
     return 0;
 }
 
-void close_socket(int fd)
+void destroy_socket(int fd)
 {
     close(fd);
 }

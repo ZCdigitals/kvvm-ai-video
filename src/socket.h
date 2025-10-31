@@ -26,10 +26,10 @@ int init_socket(const char *path);
 int send_frame(int fd, uint32_t id, uint64_t time, uint32_t width, uint32_t height, void *data, uint32_t size);
 
 /**
- * close socket
+ * destroy socket
  *
  * @param fd socket file description
  */
-void close_socket(int fd);
+void destroy_socket(int fd);
 
 #endif
