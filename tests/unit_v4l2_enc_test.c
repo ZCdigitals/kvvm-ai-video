@@ -4,17 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <sys/ioctl.h>
-
-#include <linux/videodev2.h>
-
 #include <pthread.h>
 
-#include "rk_mpi_mb.h"
-#include "rk_mpi_mmz.h"
-#include "rk_mpi_venc.h"
+#include "rk_comm_video.h"
 
-#include "utils.h"
 #include "video.h"
 
 #define VIDEO_WIDTH 1920
