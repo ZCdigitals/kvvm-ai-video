@@ -3,223 +3,215 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "enc.h"
+#include <pthread.h>
+
+#include "rk_comm_video.h"
+
 #include "socket.h"
-#include "utils.h"
 #include "video.h"
 
-#define BIT_RATE 10 * 1024
-#define GOP 2
-
-#define BUFFER_COUNT 4
-
-#define VIDEO_PATH "/dev/video0"
 #define VIDEO_WIDTH 1920
 #define VIDEO_HEIGHT 1080
-#define OUTPUT_PATH "/tmp/capture.sock"
 
-// 全局标志位，用于控制主循环
+#define VENC_CHANNEL 0
+#define BIT_RATE 10 * 1024
+#define GOP 60
+// venc send frame timeout, venc get stream timeout
+#define TIMEOUT 1000
+
+// video device path
+#define VIDEO_PATH "/dev/video0"
+#define BUFFER_COUNT 4
+
+// output socket path
+#define OUTPUT_PATH "/var/run/capture.sock"
+
+// running
 static volatile int keep_running = 1;
 
-struct buffer
-{
-    int fd;
-};
-
-// buffers
-static struct buffer *buffers = NULL;
-static unsigned int buffer_count = 0;
-
-void main_stop()
+/**
+ * stop running
+ */
+void stop_running()
 {
     keep_running = 0;
 }
 
-void *input(void *args)
+int null_data_callback(void *data, unsigned int size)
 {
-    unsigned int id = 0;
-    unsigned long long int time = 0;
-
-    // capture frame, dequeue buffer
-    int plane_fd = capture_v4l2_frame(&id, &time);
-    if (plane_fd == -1)
-    {
-        return NULL;
-    }
-
-    // send to enc
-    int ret = send_venc_frame(plane_fd, id, time, !keep_running);
-    if (ret == -1)
-    {
-        return NULL;
-    }
-
-    // release frame, requeue buffer
-    ret = release_v4l2_frame();
-    if (ret == -1)
-    {
-        return NULL;
-    }
-
-    return NULL;
+    return 0;
 }
 
-static volatile uint32_t frame_id = 0;
-
-void *output(void *args)
+typedef struct
 {
-    void *frame;
-    unsigned int size;
+    int venc_channel_id;
+    int video_fd;
+    unsigned int width;
+    unsigned int height;
+    unsigned int vir_width;
+    unsigned int vir_height;
+} input_args_t;
 
-    int ret = read_venc_frame(&frame, &size);
-    if (ret == -1)
-    {
-        return NULL;
-    }
-
-    ret = send_frame(frame_id, get_time_us(), frame, size);
-    frame_id += 1;
-    if (ret == -1)
-    {
-        return NULL;
-    }
-
-    ret = release_venc_frame();
-    if (ret == -1)
-    {
-        return NULL;
-    }
-
-    return NULL;
-}
-
-int init()
+void *input_loop(void *arg)
 {
-    buffer_count = init_v4l2(VIDEO_PATH, VIDEO_WIDTH, VIDEO_HEIGHT, BUFFER_COUNT);
-    if (buffer_count == 0)
+    input_args_t *args = (input_args_t *)arg;
+
+    while (keep_running)
     {
-        return -1;
-    }
-
-    int ret = init_venc(BIT_RATE, GOP, VIDEO_WIDTH, VIDEO_HEIGHT);
-    if (ret == -1)
-    {
-        close_v4l2();
-        goto error1;
-    }
-
-    ret = init_socket(OUTPUT_PATH, VIDEO_WIDTH, VIDEO_HEIGHT);
-    if (ret == -1)
-    {
-        close_v4l2();
-        close_venc();
-        goto error2;
-    }
-
-    buffers = calloc(buffer_count, sizeof(*buffers));
-    if (buffers == NULL)
-    {
-        errno = -1;
-        perror("calloc buffers error");
-        goto error3;
-    }
-
-    for (unsigned int i = 0; i < buffer_count; i += 1)
-    {
-        unsigned int plane_length = init_v4l2_buffer(i);
-        if (plane_length == 0)
-        {
-            goto error3;
-        }
-
-        int fd = use_venc_frame(plane_length);
-        if (fd == -1)
-        {
-            goto error3;
-        }
-        buffers[i].fd = fd;
-
-        int ret = use_v4l2_buffer(fd);
+        int ret = input(args->venc_channel_id, args->video_fd, args->width, args->height, args->vir_width, args->vir_height, !keep_running, TIMEOUT);
         if (ret == -1)
         {
-            goto error3;
+            break;
         }
     }
 
-error3:
-    close_socket();
-    goto error2;
-error2:
-    close_venc();
-    goto error1;
-error1:
-    close_v4l2();
-    return 0;
+    stop_running();
+    return NULL;
 }
 
-int start()
+typedef struct
 {
-    int ret = start_venc();
-    if (ret == -1)
+    int venc_channel_id;
+    int socket_fd;
+} output_args_t;
+
+void *output_loop(void *arg)
+{
+    output_args_t *args = (output_args_t *)arg;
+
+    VENC_STREAM_S stream;
+    stream.pstPack = malloc(sizeof(VENC_PACK_S));
+
+    while (keep_running)
     {
-        return -1;
+        int ret = output(args->venc_channel_id, &stream, TIMEOUT, null_data_callback);
+        if (ret == -1)
+        {
+            // error break
+            break;
+        }
+
+        if (stream.pstPack->bStreamEnd)
+        {
+            // end break
+            break;
+        }
     }
 
-    ret = start_v4l2_capture();
-    if (ret == -1)
+    if (stream.pstPack)
     {
-        return -1;
+        free(stream.pstPack);
     }
 
-    return 0;
-}
-
-int stop()
-{
-    stop_v4l2_capture();
-    stop_venc();
-    return 0;
-}
-
-int close()
-{
-    for (unsigned int i = 0; i < buffer_count; i += 1)
-    {
-        free_venc_frame(buffers[i].fd);
-    }
-
-    close_v4l2();
-    close_venc();
-    close_socket();
-
-    return 0;
+    stop_running();
+    return NULL;
 }
 
 int main()
 {
-    int ret = init();
-    if (ret == -1)
-    {
-        return -1;
-    }
-
     // regist signal
-    signal(SIGINT, main_stop);
-    signal(SIGTERM, main_stop);
+    signal(SIGINT, stop_running);
+    signal(SIGTERM, stop_running);
 
-    ret = start();
+    // calculate size
+    MB_PIC_CAL_S cal;
+    // 1920 1080 will be strided to 1920 1088
+    // but v4l2 dma can not fill all byes, then venc think the frame is not end and will not work at all
+    // that is why we should calculate manually
+    // calculate_venc(VIDEO_WIDTH, VIDEO_HEIGHT, &cal);
+    cal.u32VirWidth = VIDEO_WIDTH;
+    cal.u32VirHeight = VIDEO_HEIGHT;
+    cal.u32MBSize = VIDEO_WIDTH * VIDEO_HEIGHT * 3 / 2;
+    printf("manual calculate ok %d %d %d\n", cal.u32VirWidth, cal.u32VirHeight, cal.u32MBSize);
+
+    // init venc
+    // i dont know why stream output buffer count is 8
+    // in `test_mpi_venc.cpp`, they use 8
+    int ret = init_venc(VENC_CHANNEL, VIDEO_WIDTH, VIDEO_HEIGHT, BIT_RATE, GOP, 8, cal);
+    if (ret == 1)
+    {
+        return ret;
+    }
+
+    // init v4l2
+    int video_fd = init_v4l2(VIDEO_PATH, VIDEO_WIDTH, VIDEO_HEIGHT);
+    unsigned int buffer_count = init_v4l2_buffers(video_fd, BUFFER_COUNT);
+    if (buffer_count == 0)
+    {
+        goto destroy_venc;
+    }
+
+    // init buffers
+    unsigned int memory_pool = init_venc_memory(buffer_count, cal);
+    if (memory_pool == MB_INVALID_POOLID)
+    {
+        goto destroy_v4l2;
+    }
+
+    void *blocks[BUFFER_COUNT];
+    ret = allocate_buffers(video_fd, memory_pool, buffer_count, blocks);
     if (ret == -1)
     {
-        close();
-        return -1;
+        goto destroy_v4l2;
     }
 
-    while (keep_running)
+    // start venc
+    ret = start_venc(VENC_CHANNEL);
+    if (ret == -1)
     {
+        goto free_buffers;
     }
 
-    stop();
-    close();
+    // start v4l2
+    ret = start_v4l2(video_fd);
+    if (ret == -1)
+    {
+        goto stop_venc;
+    }
 
-    return 0;
+    // threads
+    pthread_t input_thread;
+    pthread_t output_thread;
+
+    input_args_t input_args = {
+        .venc_channel_id = VENC_CHANNEL,
+        .video_fd = video_fd,
+        .width = VIDEO_WIDTH,
+        .height = VIDEO_HEIGHT,
+        .vir_width = cal.u32VirWidth,
+        .vir_height = cal.u32VirHeight,
+
+    };
+    output_args_t outpu_args = {
+        .venc_channel_id = VENC_CHANNEL,
+        .socket_fd = 1,
+    };
+
+    pthread_create(&input_thread, NULL, input_loop, &input_args);
+    pthread_create(&output_thread, NULL, output_loop, &outpu_args);
+
+    // wait thread end
+    pthread_join(input_thread, NULL);
+    pthread_join(output_thread, NULL);
+
+    // stop v4l2
+    stop_v4l2(video_fd);
+
+stop_venc:
+    // stop venc
+    ret = stop_venc(VENC_CHANNEL);
+
+free_buffers:
+    // free buffer
+    ret = free_buffers(BUFFER_COUNT, blocks);
+
+destroy_v4l2:
+    // destroy v4l2
+    destroy_v4l2(video_fd);
+
+destroy_venc:
+    // destroy venc
+    destroy_venc(VENC_CHANNEL, memory_pool);
+
+    return ret;
 }
