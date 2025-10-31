@@ -39,6 +39,11 @@
         "string_view": "c",
         "initializer_list": "c",
         "rk_comm_video.h": "c",
-        "pthread.h": "c"
+        "pthread.h": "c",
+        "getopt_posix.h": "c",
+        "stdint.h": "c",
+        "getopt.h": "c",
+        "getopt_core.h": "c",
+        "getopt_ext.h": "c"
     }
 }

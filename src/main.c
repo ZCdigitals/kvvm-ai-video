@@ -8,11 +8,9 @@
 
 #include "rk_comm_video.h"
 
+#include "args.h"
 #include "socket.h"
 #include "video.h"
-
-#define VIDEO_WIDTH 1920
-#define VIDEO_HEIGHT 1080
 
 #define VENC_CHANNEL 0
 #define BIT_RATE 10 * 1024
@@ -146,11 +144,17 @@ void *output_loop(void *arg)
     return NULL;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     // regist signal
     signal(SIGINT, stop_running);
     signal(SIGTERM, stop_running);
+
+    args_t args;
+    parse_args(argc, argv, &args);
+
+    unsigned int video_width = args.width;
+    unsigned int video_height = args.height;
 
     // init socket
     int socket_fd = init_socket(OUTPUT_PATH);
@@ -164,23 +168,23 @@ int main()
     // 1920 1080 will be strided to 1920 1088
     // but v4l2 dma can not fill all byes, then venc think the frame is not end and will not work at all
     // that is why we should calculate manually
-    // calculate_venc(VIDEO_WIDTH, VIDEO_HEIGHT, &cal);
-    cal.u32VirWidth = VIDEO_WIDTH;
-    cal.u32VirHeight = VIDEO_HEIGHT;
-    cal.u32MBSize = VIDEO_WIDTH * VIDEO_HEIGHT * 3 / 2;
+    // calculate_venc(video_width, video_height, &cal);
+    cal.u32VirWidth = video_width;
+    cal.u32VirHeight = video_height;
+    cal.u32MBSize = video_width * video_height * 3 / 2;
     printf("manual calculate ok %d %d %d\n", cal.u32VirWidth, cal.u32VirHeight, cal.u32MBSize);
 
     // init venc
     // i dont know why stream output buffer count is 8
     // in `test_mpi_venc.cpp`, they use 8
-    int ret = init_venc(VENC_CHANNEL, VIDEO_WIDTH, VIDEO_HEIGHT, BIT_RATE, GOP, 8, cal);
+    int ret = init_venc(VENC_CHANNEL, video_width, video_height, BIT_RATE, GOP, 8, cal);
     if (ret == -1)
     {
         goto destroy_socket;
     }
 
     // init v4l2
-    int video_fd = init_v4l2(VIDEO_PATH, VIDEO_WIDTH, VIDEO_HEIGHT);
+    int video_fd = init_v4l2(VIDEO_PATH, video_width, video_height);
     unsigned int buffer_count = init_v4l2_buffers(video_fd, BUFFER_COUNT);
     if (buffer_count == 0)
     {
@@ -222,8 +226,8 @@ int main()
     input_args_t input_args = {
         .venc_channel_id = VENC_CHANNEL,
         .video_fd = video_fd,
-        .width = VIDEO_WIDTH,
-        .height = VIDEO_HEIGHT,
+        .width = video_width,
+        .height = video_height,
         .vir_width = cal.u32VirWidth,
         .vir_height = cal.u32VirHeight,
 
@@ -231,8 +235,8 @@ int main()
     output_args_t outpu_args = {
         .socket_fd = socket_fd,
         .venc_channel_id = VENC_CHANNEL,
-        .width = VIDEO_WIDTH,
-        .height = VIDEO_HEIGHT,
+        .width = video_width,
+        .height = video_height,
     };
 
     pthread_create(&input_thread, NULL, input_loop, &input_args);

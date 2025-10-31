@@ -103,6 +103,7 @@ if(BUILD_MAIN)
     # create exec
     add_executable(
         ${PROJECT_NAME}
+        "src/args.c"
         "src/main.c"
         "src/socket.c"
         "src/utils.c"
