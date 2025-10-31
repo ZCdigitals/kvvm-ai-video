@@ -4,15 +4,15 @@ project(video C)
 option(BUILD_ENC_TEST "build enc test" OFF)
 option(BUILD_V4L2_TEST "build V4L2 test" OFF)
 option(BUILD_UNIT_SOCKET_TEST "build unit socket test" OFF)
-option(BUILD_UNIT_V4L2_ENC_TEST "build unit v4l2 enc test" OFF)
+option(BUILD_V4L2_ENC_TEST "build unit v4l2 enc test" OFF)
 option(BUILD_MAIN "build main" ON)
 
-if(BUILD_UNIT_V4L2_ENC_TEST OR BUILD_MAIN)
+if(BUILD_V4L2_ENC_TEST OR BUILD_MAIN)
     set(THREADS_PREFER_PTHREAD_FLAG ON)
     find_package(Threads REQUIRED)
 endif()
 
-if(BUILD_ENC_TEST OR BUILD_UNIT_V4L2_ENC_TEST OR BUILD_MAIN)
+if(BUILD_ENC_TEST OR BUILD_V4L2_ENC_TEST OR BUILD_MAIN)
     # find lib
     find_library(ROCKIT_LIB
         NAMES rockit librockit.so librockit.a
@@ -54,7 +54,7 @@ if(BUILD_V4L2_TEST)
     )
 endif()
 
-if(BUILD_UNIT_V4L2_ENC_TEST)
+if(BUILD_V4L2_ENC_TEST)
     # build unit v4l2 enc test
     add_executable(
         unit_v4l2_enc_test

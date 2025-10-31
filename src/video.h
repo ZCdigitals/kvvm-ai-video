@@ -147,11 +147,14 @@ int input(int venc_channel_id, int video_fd, unsigned int width, unsigned int he
 
 /**
  * output data callback
+ * @param frame_id framd id
+ * @param time time
  * @param data data pointer
  * @param size size
+ * @param user_data context pointer
  * @returns 0 ok, -1 error
  */
-typedef int (*output_data_callback)(void *data, unsigned int size);
+typedef int (*output_data_callback)(unsigned int frame_id, unsigned long long int time, void *data, unsigned int size, void *user_data);
 
 /**
  * output
@@ -163,6 +166,6 @@ typedef int (*output_data_callback)(void *data, unsigned int size);
  * @param timeout get stream timeout
  * @returns 0 ok, -1 error
  */
-int output(int venc_channel_id, VENC_STREAM_S *stream, int timeout, output_data_callback callback);
+int output(int venc_channel_id, VENC_STREAM_S *stream, int timeout, output_data_callback callback, void *callback_context);
 
 #endif

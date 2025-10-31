@@ -458,7 +458,7 @@ int input(int venc_channel_id, int video_fd, unsigned int width, unsigned int he
     return 0;
 }
 
-int output(int venc_channel_id, VENC_STREAM_S *stream, int timeout, output_data_callback callback)
+int output(int venc_channel_id, VENC_STREAM_S *stream, int timeout, output_data_callback callback, void *callback_context)
 {
     int ret = RK_MPI_VENC_GetStream(venc_channel_id, stream, timeout);
     if (ret != RK_SUCCESS)
@@ -473,7 +473,7 @@ int output(int venc_channel_id, VENC_STREAM_S *stream, int timeout, output_data_
     // read to destnation
     void *dst = RK_MPI_MB_Handle2VirAddr(stream->pstPack->pMbBlk);
 
-    callback(dst, size);
+    callback(stream->u32Seq, stream->pstPack->u64PTS, dst, size, callback_context);
 
     // release stream
     ret = RK_MPI_VENC_ReleaseStream(venc_channel_id, stream);

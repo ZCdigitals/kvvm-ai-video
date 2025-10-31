@@ -25,7 +25,7 @@
 
 #define OUTPUT_PATH "data/frame.h264"
 
-int save_data(void *data, unsigned int size)
+int save_data(unsigned int frame_id, unsigned long long int time, void *data, unsigned int size, void *user_data)
 {
     FILE *f = fopen(OUTPUT_PATH, "wb");
     if (f == NULL)
@@ -99,7 +99,8 @@ void *output_loop(void *arg)
         int ret = output(args->venc_channel_id,
                          &stream,
                          TIMEOUT,
-                         save_data);
+                         save_data,
+                         NULL);
         if (ret == -1)
         {
             // error break

@@ -102,7 +102,7 @@ int main()
         frame_id += 1;
     }
 
-    close_socket(fd);
+    destroy_socket(fd);
     free(buffer);
 
     return 0;

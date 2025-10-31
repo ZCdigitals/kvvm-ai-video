@@ -45,6 +45,25 @@ void stop_running()
 
 typedef struct
 {
+    int fd;
+    uint32_t width;
+    uint32_t height;
+} output_callback_context_t;
+
+int output_callback(unsigned int frame_id, unsigned long long int time, void *data, unsigned int size, void *user_data)
+{
+    if (user_data == NULL)
+    {
+        errno = -1;
+        perror("output callback null user data");
+        return -1;
+    }
+    output_callback_context_t *ctx = (output_callback_context_t *)user_data;
+    return send_frame(ctx->fd, frame_id, time, ctx->width, ctx->height, data, size);
+}
+
+typedef struct
+{
     int venc_channel_id;
     int video_fd;
     unsigned int width;
@@ -59,7 +78,14 @@ void *input_loop(void *arg)
 
     while (keep_running)
     {
-        int ret = input(args->venc_channel_id, args->video_fd, args->width, args->height, args->vir_width, args->vir_height, !keep_running, TIMEOUT);
+        int ret = input(args->venc_channel_id,
+                        args->video_fd,
+                        args->width,
+                        args->height,
+                        args->vir_width,
+                        args->vir_height,
+                        !keep_running,
+                        TIMEOUT);
         if (ret == -1)
         {
             break;
@@ -72,20 +98,32 @@ void *input_loop(void *arg)
 
 typedef struct
 {
-    int venc_channel_id;
     int socket_fd;
+    int venc_channel_id;
+    unsigned int width;
+    unsigned int height;
 } output_args_t;
 
 void *output_loop(void *arg)
 {
     output_args_t *args = (output_args_t *)arg;
 
+    output_callback_context_t ctx = {
+        .fd = args->socket_fd,
+        .width = args->width,
+        .height = args->height,
+    };
+
     VENC_STREAM_S stream;
     stream.pstPack = malloc(sizeof(VENC_PACK_S));
 
     while (keep_running)
     {
-        int ret = output(args->venc_channel_id, &stream, TIMEOUT, null_data_callback);
+        int ret = output(args->venc_channel_id,
+                         &stream,
+                         TIMEOUT,
+                         output_callback,
+                         &ctx);
         if (ret == -1)
         {
             // error break
@@ -114,6 +152,13 @@ int main()
     signal(SIGINT, stop_running);
     signal(SIGTERM, stop_running);
 
+    // init socket
+    int socket_fd = init_socket(OUTPUT_PATH);
+    if (socket_fd == -1)
+    {
+        return -1;
+    }
+
     // calculate size
     MB_PIC_CAL_S cal;
     // 1920 1080 will be strided to 1920 1088
@@ -129,9 +174,9 @@ int main()
     // i dont know why stream output buffer count is 8
     // in `test_mpi_venc.cpp`, they use 8
     int ret = init_venc(VENC_CHANNEL, VIDEO_WIDTH, VIDEO_HEIGHT, BIT_RATE, GOP, 8, cal);
-    if (ret == 1)
+    if (ret == -1)
     {
-        return ret;
+        goto destroy_socket;
     }
 
     // init v4l2
@@ -184,8 +229,10 @@ int main()
 
     };
     output_args_t outpu_args = {
+        .socket_fd = socket_fd,
         .venc_channel_id = VENC_CHANNEL,
-        .socket_fd = 1,
+        .width = VIDEO_WIDTH,
+        .height = VIDEO_HEIGHT,
     };
 
     pthread_create(&input_thread, NULL, input_loop, &input_args);
@@ -213,6 +260,9 @@ destroy_v4l2:
 destroy_venc:
     // destroy venc
     destroy_venc(VENC_CHANNEL, memory_pool);
+
+destroy_socket:
+    destroy_socket(socket_fd);
 
     return ret;
 }
