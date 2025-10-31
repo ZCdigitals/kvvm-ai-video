@@ -1,7 +1,10 @@
 #ifndef VIDEO_H
 #define VIDEO_H
 
+#include <stdbool.h>
+
 #include "rk_comm_video.h"
+#include "rk_mpi_venc.h"
 
 #define RK_COLOR RK_FMT_YUV420SP
 #define V4L2_COLOR V4L2_PIX_FMT_NV12
@@ -124,5 +127,42 @@ int allocate_buffers(unsigned int memory_pool_id, int video_fd, unsigned int buf
  * @return 0 ok, -1 error
  */
 int free_buffers(unsigned int buffer_count, void *buffers[]);
+
+/**
+ * input
+ *
+ * read raw frame from v4l2 and send to venc
+ *
+ * @param venc_channel_id venc channel id, must be [0, VENC_MAX_CHN_NUM)
+ * @param video_fd device file description
+ * @param width video width, eg. `1920`
+ * @param height video height, eg. `1080`
+ * @param vir_width stride width
+ * @param vir_height stride height
+ * @param is_end is end frame
+ * @param timeout send frame timeout
+ * @returns 0 ok, -1 error
+ */
+int input(int venc_channel_id, int video_fd, unsigned int width, unsigned int height, unsigned int vir_width, unsigned int vir_height, bool is_end, int timeout);
+
+/**
+ * output data callback
+ * @param data data pointer
+ * @param size size
+ * @returns 0 ok, -1 error
+ */
+typedef int (*output_data_callback)(void *data, unsigned int size);
+
+/**
+ * output
+ *
+ * read encoded frame from venc stream
+ *
+ * @param venc_channel_id venc channel id, must be [0, VENC_MAX_CHN_NUM)
+ * @param stream stream pointer
+ * @param timeout get stream timeout
+ * @returns 0 ok, -1 error
+ */
+int output(int venc_channel_id, VENC_STREAM_S *stream, int timeout, output_data_callback callback);
 
 #endif

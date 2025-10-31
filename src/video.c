@@ -19,6 +19,8 @@
 #include "rk_mpi_venc.h"
 #include "rk_type.h"
 
+#include "utils.h"
+
 int calculate_venc(unsigned int width, unsigned int height, MB_PIC_CAL_S *mb_pic_cal)
 {
 
@@ -377,6 +379,111 @@ int free_buffers(unsigned int buffer_count, void *blocks[])
         }
         printf("mpi memory release block ok\n");
     }
+
+    return 0;
+}
+
+int input(int venc_channel_id, int video_fd, unsigned int width, unsigned int height, unsigned int vir_width, unsigned int vir_height, bool is_end, int timeout)
+{
+    struct v4l2_buffer buf;
+    struct v4l2_plane plane;
+
+    memset(&buf, 0, sizeof(buf));
+    memset(&plane, 0, sizeof(plane));
+    buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+    buf.memory = V4L2_MEMORY_DMABUF;
+    buf.length = 1;
+    buf.m.planes = &plane;
+
+    int ret = ioctl(video_fd, VIDIOC_DQBUF, &buf);
+    if (ret == -1)
+    {
+        perror("video device dequeue buffer error");
+        return -1;
+    }
+    // printf("video device dequeue buffer %d %d %d ok\n", buf.index, buf.sequence, plane.bytesused);
+
+    MB_BLK block = RK_MPI_MMZ_Fd2Handle(plane.m.fd);
+    // check block
+    if (block == RK_NULL)
+    {
+        errno = -1;
+        perror("null block");
+        return -1;
+    }
+
+    // there is no need to flush cache, but i do not known why
+    // in `test_mpi_venc.cpp`, they have this step
+    // int32_t ret = RK_MPI_SYS_MmzFlushCache(block, RK_FALSE);
+    // if (ret != RK_SUCCESS)
+    // {
+    //     errno = ret;
+    //     perror("mpi memory flush cache error");
+    //     continue;
+    // }
+    // printf("mpi memory flush cache ok\n");
+
+    VIDEO_FRAME_INFO_S frame;
+    memset(&frame, 0, sizeof(VIDEO_FRAME_INFO_S));
+    frame.stVFrame.pMbBlk = block;
+    frame.stVFrame.u32Width = width;
+    frame.stVFrame.u32Height = height;
+    frame.stVFrame.u32VirWidth = vir_width;
+    frame.stVFrame.u32VirHeight = vir_height;
+    frame.stVFrame.enPixelFormat = RK_COLOR;
+
+    frame.stVFrame.u32TimeRef = buf.sequence;
+    frame.stVFrame.u64PTS = time_to_us(buf.timestamp);
+
+    frame.stVFrame.u32FrameFlag |= is_end ? 0 : FRAME_FLAG_SNAP_END;
+
+    // send frame
+    ret = RK_MPI_VENC_SendFrame(venc_channel_id, &frame, timeout);
+    if (ret != RK_SUCCESS)
+    {
+        errno = ret;
+        perror("mpi venc send frame error");
+        return -1;
+    }
+    // printf("mpi venc send frame ok\n");
+
+    ret = ioctl(video_fd, VIDIOC_QBUF, &buf);
+    if (ret == -1)
+    {
+        perror("video device requeue buffer error");
+        return -1;
+    }
+    // printf("video device requeue buffer %d ok\n", buf.index);
+
+    return 0;
+}
+
+int output(int venc_channel_id, VENC_STREAM_S *stream, int timeout, output_data_callback callback)
+{
+    int ret = RK_MPI_VENC_GetStream(venc_channel_id, stream, timeout);
+    if (ret != RK_SUCCESS)
+    {
+        errno = ret;
+        perror("mpi venc get stream error");
+        return -1;
+    }
+    // printf("mpi venc get stream ok %d %d\n", stream->u32Seq, stream->pstPack->u64PTS);
+
+    unsigned int size = stream->pstPack->u32Len;
+    // read to destnation
+    void *dst = RK_MPI_MB_Handle2VirAddr(stream->pstPack->pMbBlk);
+
+    callback(dst, size);
+
+    // release stream
+    ret = RK_MPI_VENC_ReleaseStream(venc_channel_id, stream);
+    if (ret != RK_SUCCESS)
+    {
+        errno = ret;
+        perror("mpi venc release stream error");
+        return -1;
+    }
+    // printf("mpi venc release stream ok\n");
 
     return 0;
 }
