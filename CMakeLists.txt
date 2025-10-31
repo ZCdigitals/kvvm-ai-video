@@ -82,7 +82,6 @@ if(BUILD_UNIT_V4L2_ENC_TEST)
         ${RGA_LIB}
     )
 
-
     add_executable(
         v4l2_enc_test
         "tests/v4l2_enc_test.c"
@@ -92,7 +91,6 @@ if(BUILD_UNIT_V4L2_ENC_TEST)
         ${PROJECT_SOURCE_DIR}/src
     )
     target_link_libraries(v4l2_enc_test PRIVATE
-        Threads::Threads
         ${ROCKIT_LIB}
         ${ROCKCHIP_MPP_LIB}
         ${RGA_LIB}
