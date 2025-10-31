@@ -2,6 +2,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <pthread.h>
 
@@ -26,6 +27,11 @@
 // output socket path
 #define OUTPUT_PATH "/var/run/capture.sock"
 
+int null_data_callback(void *data, unsigned int size)
+{
+    return 0;
+}
+
 // running
 static volatile int keep_running = 1;
 
@@ -35,11 +41,6 @@ static volatile int keep_running = 1;
 void stop_running()
 {
     keep_running = 0;
-}
-
-int null_data_callback(void *data, unsigned int size)
-{
-    return 0;
 }
 
 typedef struct
@@ -149,7 +150,7 @@ int main()
     }
 
     void *blocks[BUFFER_COUNT];
-    ret = allocate_buffers(video_fd, memory_pool, buffer_count, blocks);
+    ret = allocate_buffers(memory_pool, video_fd, buffer_count, blocks);
     if (ret == -1)
     {
         goto destroy_v4l2;
