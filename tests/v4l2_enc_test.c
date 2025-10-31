@@ -475,8 +475,8 @@ void *input(void *arg)
         frame.stVFrame.pMbBlk = block;
         frame.stVFrame.u32Width = args->width;
         frame.stVFrame.u32Height = args->height;
-        frame.stVFrame.u32VirWidth = args->width;
-        frame.stVFrame.u32VirHeight = args->height;
+        frame.stVFrame.u32VirWidth = args->vir_width;
+        frame.stVFrame.u32VirHeight = args->vir_height;
         frame.stVFrame.enPixelFormat = RK_FMT_YUV420SP;
 
         frame.stVFrame.u32TimeRef = buf.sequence;
@@ -558,11 +558,11 @@ void *output(void *arg)
         {
             break;
         }
+    }
 
-        if (stream.pstPack)
-        {
-            free(stream.pstPack);
-        }
+    if (stream.pstPack)
+    {
+        free(stream.pstPack);
     }
 
     return NULL;
@@ -614,6 +614,8 @@ int main()
         .video_fd = video_fd,
         .width = VIDEO_WIDTH,
         .height = VIDEO_HEIGHT,
+        .vir_width = cal.u32VirWidth,
+        .vir_height = cal.u32VirHeight,
 
         .venc_channel_id = VENC_CHANNEL,
     };
