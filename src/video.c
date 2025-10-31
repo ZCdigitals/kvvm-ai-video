@@ -435,7 +435,7 @@ int input(int venc_channel_id, int video_fd, unsigned int width, unsigned int he
     frame.stVFrame.u32TimeRef = buf.sequence;
     frame.stVFrame.u64PTS = time_to_us(buf.timestamp);
 
-    frame.stVFrame.u32FrameFlag |= is_end ? 0 : FRAME_FLAG_SNAP_END;
+    frame.stVFrame.u32FrameFlag |= is_end ? FRAME_FLAG_SNAP_END : 0;
 
     // send frame
     ret = RK_MPI_VENC_SendFrame(venc_channel_id, &frame, timeout);

@@ -69,7 +69,8 @@ void *input_loop(void *arg)
 
     while (keep_running)
     {
-        int ret = input(args->venc_channel_id, args->video_fd, args->width, args->height, args->vir_width, args->vir_height, !keep_running, TIMEOUT);
+        // stop after 1 frame, for test
+        int ret = input(args->venc_channel_id, args->video_fd, args->width, args->height, args->vir_width, args->vir_height, true, TIMEOUT);
         if (ret == -1)
         {
             break;
@@ -95,7 +96,10 @@ void *output_loop(void *arg)
 
     while (keep_running)
     {
-        int ret = output(args->venc_channel_id, &stream, TIMEOUT, save_data);
+        int ret = output(args->venc_channel_id,
+                         &stream,
+                         TIMEOUT,
+                         save_data);
         if (ret == -1)
         {
             // error break
