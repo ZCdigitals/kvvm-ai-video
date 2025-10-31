@@ -12,10 +12,6 @@
 
 #include "utils.h"
 
-static uint32_t picture_width = 0;
-static uint32_t picture_height = 0;
-static int fd = -1;
-
 typedef struct
 {
     uint32_t id;
@@ -33,13 +29,9 @@ typedef struct
     uint32_t reserved;
 } frame_header;
 
-int init_socket(const char *path, uint32_t width, uint32_t height)
+int init_socket(const char *path)
 {
-    // set data
-    picture_width = width;
-    picture_height = height;
-
-    fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd == -1)
     {
         perror("socket error");
@@ -61,18 +53,18 @@ int init_socket(const char *path, uint32_t width, uint32_t height)
         return -1;
     }
 
-    return 0;
+    return fd;
 }
 
-int send_frame(uint32_t id, uint64_t time, void *data, uint32_t size)
+int send_frame(int fd, uint32_t id, uint64_t time, uint32_t width, uint32_t height, void *data, uint32_t size)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
     frame_header header = {
         .id = id,
-        .width = picture_width,
-        .height = picture_height,
+        .width = width,
+        .height = height,
         .format = 0,
         .time = time,
         .size = size,
@@ -104,11 +96,7 @@ int send_frame(uint32_t id, uint64_t time, void *data, uint32_t size)
     return 0;
 }
 
-void close_socket()
+void close_socket(int fd)
 {
-    if (fd >= 0)
-    {
-        close(fd);
-        fd = -1;
-    }
+    close(fd);
 }

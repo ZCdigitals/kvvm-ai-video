@@ -1,21 +1,19 @@
 cmake_minimum_required(VERSION 3.22)
 project(video C)
 
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-
 option(BUILD_ENC_TEST "build enc test" OFF)
 option(BUILD_V4L2_TEST "build V4L2 test" OFF)
 option(BUILD_UNIT_SOCKET_TEST "build unit socket test" OFF)
 option(BUILD_UNIT_V4L2_ENC_TEST "build unit v4l2 enc test" OFF)
 option(BUILD_MAIN "build main" ON)
 
-include_directories(
-    ${PROJECT_SOURCE_DIR}/include
-)
+if(BUILD_UNIT_V4L2_ENC_TEST OR BUILD_MAIN)
+    set(THREADS_PREFER_PTHREAD_FLAG ON)
+    find_package(Threads REQUIRED)
+endif()
 
 if(BUILD_ENC_TEST OR BUILD_UNIT_V4L2_ENC_TEST OR BUILD_MAIN)
     # find lib
-    find_package(Threads REQUIRED)
     find_library(ROCKIT_LIB
         NAMES rockit librockit.so librockit.a
         REQUIRED
@@ -30,11 +28,15 @@ if(BUILD_ENC_TEST OR BUILD_UNIT_V4L2_ENC_TEST OR BUILD_MAIN)
     )
 endif()
 
+include_directories(
+    ${PROJECT_SOURCE_DIR}/include
+)
+
 if(BUILD_ENC_TEST)
     # build enc test
     add_executable(
         enc_test
-        "tests/enc_test2.c"
+        "tests/enc_test.c"
     )
     # link
     target_link_libraries(enc_test PRIVATE
@@ -49,19 +51,6 @@ if(BUILD_V4L2_TEST)
     add_executable(
         v4l2_test
         "tests/v4l2_test.c"
-    )
-endif()
-
-if(BUILD_UNIT_SOCKET_TEST)
-    # build unit socket test
-    add_executable(
-        unit_socket_test
-        "tests/unit_socket_test.c"
-        "src/socket.c"
-        "src/utils.c"
-    )
-    target_include_directories(unit_socket_test PRIVATE
-        ${PROJECT_SOURCE_DIR}/src
     )
 endif()
 
@@ -97,11 +86,23 @@ if(BUILD_UNIT_V4L2_ENC_TEST)
     )
 endif()
 
+if(BUILD_UNIT_SOCKET_TEST)
+    # build unit socket test
+    add_executable(
+        unit_socket_test
+        "tests/unit_socket_test.c"
+        "src/socket.c"
+        "src/utils.c"
+    )
+    target_include_directories(unit_socket_test PRIVATE
+        ${PROJECT_SOURCE_DIR}/src
+    )
+endif()
+
 if(BUILD_MAIN)
     # create exec
     add_executable(
         ${PROJECT_NAME}
-        "src/enc.c"
         "src/main.c"
         "src/socket.c"
         "src/utils.c"

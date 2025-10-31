@@ -1,27 +1,35 @@
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
-#include <unistd.h>
+
 #include <sys/time.h>
+
+#include <unistd.h>
 
 #include "socket.h"
 #include "utils.h"
 
-#define VIDEO_PATH "frame.h264"
 #define VIDEO_WIDTH 1920
 #define VIDEO_HEIGHT 1080
+
+#define VIDEO_PATH "data/frame.h264"
+
 #define OUTPUT_PATH "/tmp/capture.sock"
 
 #define FRAME_DURATION 33333
 
-// 全局标志位，用于控制主循环
-static int keep_running = 1;
-static int frame_id = 0;
+// running
+static volatile int keep_running = 1;
 
-void main_stop()
+/**
+ * stop running
+ */
+void stop_running()
 {
     keep_running = 0;
 }
+
+static int frame_id = 0;
 
 int read_file(unsigned char **buffer)
 {
@@ -61,6 +69,10 @@ int read_file(unsigned char **buffer)
 
 int main()
 {
+    // regist signal
+    signal(SIGINT, stop_running);
+    signal(SIGTERM, stop_running);
+
     unsigned char *buffer;
 
     size_t size = read_file(&buffer);
@@ -69,30 +81,28 @@ int main()
         return -1;
     }
 
-    int ret = init_socket(OUTPUT_PATH, VIDEO_WIDTH, VIDEO_HEIGHT);
-    if (ret == -1)
+    int fd = init_socket(OUTPUT_PATH);
+    if (fd == -1)
     {
         return -1;
     }
 
-    // regist signal
-    signal(SIGINT, main_stop);
-    signal(SIGTERM, main_stop);
-
     while (keep_running)
     {
-        ret = send_frame(frame_id, get_time_us(), buffer, size);
+        int ret = send_frame(fd, frame_id, get_time_us(), VIDEO_WIDTH, VIDEO_HEIGHT, buffer, size);
         if (ret == -1)
         {
-            main_stop();
+            stop_running();
         }
         else
         {
             usleep(FRAME_DURATION);
         }
+
+        frame_id += 1;
     }
 
-    close_socket();
+    close_socket(fd);
     free(buffer);
 
     return 0;

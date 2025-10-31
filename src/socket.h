@@ -6,27 +6,30 @@
 /**
  * init socket
  *
- * @param path file path, eg. `/tmp/stream.sock`
- * @param width frame width
- * @param height frame height
- * @return 0 ok, -1 error
+ * @param path file path, eg. `/var/run/capture.sock`
+ * @return socket file description, -1 error
  */
-int init_socket(const char *path, uint32_t width, uint32_t height);
+int init_socket(const char *path);
 
 /**
  * send frame
  *
+ * @param fd socket file description
  * @param id frame id
  * @param time frame capture time
+ * @param width frame width
+ * @param height frame height
  * @param data frame data pointer
  * @param size frame data size
  * @return 0 ok, -1 error
  */
-int send_frame(uint32_t id, uint64_t time, void *data, uint32_t size);
+int send_frame(int fd, uint32_t id, uint64_t time, uint32_t width, uint32_t height, void *data, uint32_t size);
 
 /**
  * close socket
+ *
+ * @param fd socket file description
  */
-void close_socket();
+void close_socket(int fd);
 
 #endif
