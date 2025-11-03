@@ -89,7 +89,7 @@ int parse_args(int argc, char *argv[], args_t *args)
                 return -1;
             }
 
-            args->input_path = op;
+            args->output_path = op;
             break;
         }
         case 0:
