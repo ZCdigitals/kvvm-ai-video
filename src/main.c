@@ -19,11 +19,11 @@
 #define TIMEOUT 1000
 
 // video device path
-#define VIDEO_PATH "/dev/video0"
+// #define VIDEO_PATH "/dev/video0"
 #define BUFFER_COUNT 4
 
 // output socket path
-#define OUTPUT_PATH "/var/run/capture.sock"
+// #define OUTPUT_PATH "/var/run/capture.sock"
 
 int null_data_callback(void *data, unsigned int size)
 {
@@ -144,20 +144,14 @@ void *output_loop(void *arg)
     return NULL;
 }
 
-int main(int argc, char *argv[])
+int main_video(unsigned int video_width, unsigned int video_height, char *input_path, char *output_path)
 {
     // regist signal
     signal(SIGINT, stop_running);
     signal(SIGTERM, stop_running);
 
-    args_t args;
-    parse_args(argc, argv, &args);
-
-    unsigned int video_width = args.width;
-    unsigned int video_height = args.height;
-
     // init socket
-    int socket_fd = init_socket(OUTPUT_PATH);
+    int socket_fd = init_socket(output_path);
     if (socket_fd == -1)
     {
         return -1;
@@ -184,7 +178,7 @@ int main(int argc, char *argv[])
     }
 
     // init v4l2
-    int video_fd = init_v4l2(VIDEO_PATH, video_width, video_height);
+    int video_fd = init_v4l2(input_path, video_width, video_height);
     unsigned int buffer_count = init_v4l2_buffers(video_fd, BUFFER_COUNT);
     if (buffer_count == 0)
     {
@@ -267,6 +261,24 @@ destroy_venc:
 
 destroy_socket:
     destroy_socket(socket_fd);
+
+    return 0;
+}
+
+int main(int argc, char *argv[])
+{
+    args_t args;
+    int ret = parse_args(argc, argv, &args);
+    if (args.help_flag || args.version_flag)
+    {
+        return 0;
+    }
+    else
+    {
+        ret = main_video(args.width, args.height, args.input_path, args.output_path);
+    }
+
+    destroy_args(&args);
 
     return ret;
 }
