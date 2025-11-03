@@ -3,8 +3,9 @@ project(video C)
 
 option(BUILD_ENC_TEST "build enc test" OFF)
 option(BUILD_V4L2_TEST "build V4L2 test" OFF)
-option(BUILD_UNIT_SOCKET_TEST "build unit socket test" OFF)
 option(BUILD_V4L2_ENC_TEST "build unit v4l2 enc test" OFF)
+option(BUILD_V4L2_QUERY_SIZE_TEST "build v4l2 query size test" OFF)
+option(BUILD_UNIT_SOCKET_TEST "build unit socket test" OFF)
 option(BUILD_MAIN "build main" ON)
 
 if(BUILD_V4L2_ENC_TEST OR BUILD_MAIN)
@@ -83,6 +84,13 @@ if(BUILD_V4L2_ENC_TEST)
         ${ROCKIT_LIB}
         ${ROCKCHIP_MPP_LIB}
         ${RGA_LIB}
+    )
+endif()
+
+if(BUILD_V4L2_QUERY_SIZE_TEST)
+    add_executable(
+        v4l2_query_size_test
+        "tests/v4l2_query_size_test.c"
     )
 endif()
 
