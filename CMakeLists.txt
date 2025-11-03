@@ -108,6 +108,27 @@ if(BUILD_UNIT_SOCKET_TEST)
 endif()
 
 if(BUILD_MAIN)
+    # read version
+    file(READ ${CMAKE_SOURCE_DIR}/version VERSION_STRING)
+    string(STRIP ${VERSION_STRING} VERSION_STRING)
+
+    # read git hash
+    execute_process(
+        COMMAND git config --global --add safe.directory ${CMAKE_SOURCE_DIR}
+    )
+    execute_process(
+        COMMAND git rev-parse --short HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE COMMIT_HASH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if(NOT COMMIT_HASH)
+        set(COMMIT_HASH "unknown")
+    endif()
+
+    # get time
+    string(TIMESTAMP BUILD_TIMESTAMP "%Y-%m-%dT%H:%M:%SZ" UTC)
+
     # create exec
     add_executable(
         ${PROJECT_NAME}
@@ -119,6 +140,11 @@ if(BUILD_MAIN)
     )
     target_include_directories(${PROJECT_NAME} PRIVATE
         ${PROJECT_SOURCE_DIR}/src
+    )
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+        VERSION="${VERSION_STRING}"
+        COMMIT="${COMMIT_HASH}"
+        BUILD_TIME="${BUILD_TIMESTAMP}"
     )
     # link
     target_link_libraries(${PROJECT_NAME} PRIVATE

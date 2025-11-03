@@ -1,35 +1,47 @@
 #!/bin/bash
 
-VERSION_PATH="src/version.h"
+VERSION_PATH=version
 
-bump_major() {
-    current=$(grep "VERSION_MAJOR" $VERSION_PATH | grep -oE '[0-9]+')
-    new=$((current + 1))
-    sed -i "s/VERSION_MAJOR $current/VERSION_MAJOR $new/" $VERSION_PATH
-    sed -i "s/VERSION_MINOR [0-9]*/VERSION_MINOR 0/" $VERSION_PATH
-    sed -i "s/VERSION_PATCH [0-9]*/VERSION_PATCH 0/" $VERSION_PATH
+parse_version() {
+	local version=$(cat $VERSION_PATH)
+	IFS='.' read -ra PARTS <<< "$version"
+
+	MAJOR=${PARTS[0]}
+    MINOR=${PARTS[1]}
+    PATCH=${PARTS[2]}
 }
 
-bump_minor() {
-    current=$(grep "VERSION_MINOR" $VERSION_PATH | grep -oE '[0-9]+')
-    new=$((current + 1))
-    sed -i "s/VERSION_MINOR $current/VERSION_MINOR $new/" $VERSION_PATH
-    sed -i "s/VERSION_PATCH [0-9]*/VERSION_PATCH 0/" $VERSION_PATH
-}
-
-bump_patch() {
-    current=$(grep "VERSION_PATCH" $VERSION_PATH | grep -oE '[0-9]+')
-    new=$((current + 1))
-    sed -i "s/VERSION_PATCH $current/VERSION_PATCH $new/" $VERSION_PATH
+write_version() {
+    echo "$1" > "$VERSION_PATH"
+    echo "Version: $1"
 }
 
 create_tag() {
-    version=$(grep -E "VERSION_[A-Z]+ [0-9]+" $VERSION_PATH | awk '{printf("%s.", $3)}' | sed 's/.$//')
-    tag="v$version"
-    git tag -a "$tag" -m "Version $version"
+    git tag "$(cat $VERSION_PATH)"
 }
 
-if [$# -eq 1]; then
+bump_major() {
+    parse_version
+    MAJOR=$((MAJOR + 1))
+    MINOR=0
+    PATCH=0
+}
+
+bump_minor() {
+    parse_version
+    MINOR=$((MINOR + 1))
+    PATCH=0
+}
+
+bump_patch() {
+    parse_version
+    PATCH=$((PATCH + 1))
+}
+
+parse_version
+if [ $# -eq 0 ]; then
+    bump_patch
+elif [ $# -eq 1 ]; then
     case "$1" in
         "major")
             bump_major
@@ -41,11 +53,13 @@ if [$# -eq 1]; then
             bump_patch
             ;;
         *)
-            echo "Unknwo args"
+            echo "Unknown args"
             exit 1
     esac
 else
-    bump_patch
+	echo "Invalid args length"
+	exit 1
 fi
 
+write_version "$MAJOR.$MINOR.$PATCH"
 create_tag

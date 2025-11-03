@@ -7,8 +7,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "version.h"
-
 void print_help()
 {
     printf("Usage: -w <width> -h <height> -i <input path> -o <output path>\n");
@@ -21,7 +19,8 @@ void print_help()
 
 void print_version()
 {
-    printf("Version: %s\n", VERSION_STRING);
+    printf("Version: %s\n", VERSION);
+    printf("Git commit: %s\n", COMMIT);
     printf("Build: %s\n", BUILD_TIME);
 }
 
