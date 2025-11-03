@@ -7,6 +7,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "version.h"
+
 void print_help()
 {
     printf("Usage: -w <width> -h <height> -i <input path> -o <output path>\n");
