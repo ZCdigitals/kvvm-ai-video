@@ -16,7 +16,7 @@ jobs:
       - name: Download and setup toolchain for arm-rockchip830-linux-uclibcgnueabihf
         env:
           TOOLCHAIN_REPO: ZCdigitals/kvvm-ai-builder
-          TOOLCHAIN_TAG: v0.0.2
+          TOOLCHAIN_TAG: v0.0.3
         run: |
           wget https://github.com/$TOOLCHAIN_REPO/releases/download/$TOOLCHAIN_TAG/arm-rockchip830-linux-uclibcgnueabihf.tar.gz
           sudo mkdir -p /workspace
