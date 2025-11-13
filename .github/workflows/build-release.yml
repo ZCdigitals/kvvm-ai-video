@@ -1,0 +1,59 @@
+name: Build binary and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download and setup toolchain for arm-rockchip830-linux-uclibcgnueabihf
+        env:
+          TOOLCHAIN_REPO: ZCdigitals/kvvm-ai-builder
+          TOOLCHAIN_TAG: v0.0.2
+        run: |
+          wget https://github.com/$TOOLCHAIN_REPO/releases/download/$TOOLCHAIN_TAG/arm-rockchip830-linux-uclibcgnueabihf.tar.gz
+          sudo mkdir -p /workspace
+          sudo tar -xzf arm-rockchip830-linux-uclibcgnueabihf.tar.gz -c /workspace
+
+      - name: Build for arm-rockchip830-linux-uclibcgnueabihf
+        run: |
+          ./build.sh
+          tar -czf dist/arm-rockchip830-linux-uclibcgnueabihf-video.tar.gz dist/video
+          sha256sum dist/arm-rockchip830-linux-uclibcgnueabihf-video.tar.gz > dist/arm-rockchip830-linux-uclibcgnueabihf-video.tar.gz.sha256
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: |
+            dist/arm-rockchip830-linux-uclibcgnueabihf-video.tar.gz
+            dist/arm-rockchip830-linux-uclibcgnueabihf-video.tar.gz.sha256
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-files
+          path: ./dist
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/arm-rockchip830-linux-uclibcgnueabihf-video.tar.gz
+            dist/arm-rockchip830-linux-uclibcgnueabihf-video.tar.gz.sha256
