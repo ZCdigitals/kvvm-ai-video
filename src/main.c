@@ -27,7 +27,7 @@
 // #define OUTPUT_PATH "/var/run/capture.sock"
 
 // running
-static volatile uint32_t keep_running = 1;
+static volatile unsigned int keep_running = 1;
 
 /**
  * stop running
