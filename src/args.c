@@ -47,6 +47,10 @@ int parse_args(int argc, char *argv[], args_t *args)
 {
     int opt;
 
+    // init values
+    args->input_path = NULL;
+    args->output_path = NULL;
+
     // 使用getopt_long支持长选项
     static struct option long_options[] = {
         {"width", required_argument, 0, 'w'},
