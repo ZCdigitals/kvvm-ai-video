@@ -110,13 +110,19 @@ uint32_t init_venc_memory(uint32_t buffer_count, MB_PIC_CAL_S mb_pic_cal)
 
 void destroy_venc(int32_t channel_id, uint32_t memory_pool_id)
 {
-    int32_t ret = RK_MPI_MB_DestroyPool(memory_pool_id);
-    if (ret != RK_SUCCESS)
+    int32_t ret = RK_SUCCESS;
+
+    // avoid invalid pool
+    if (memory_pool_id != MB_INVALID_POOLID)
     {
-        errno = ret;
-        perror("mpi memory pool destory error");
+        ret = RK_MPI_MB_DestroyPool(memory_pool_id);
+        if (ret != RK_SUCCESS)
+        {
+            errno = ret;
+            perror("mpi memory pool destory error");
+        }
+        printf("mpi memory pool %d destory ok\n", memory_pool_id);
     }
-    printf("mpi memory pool %d destory ok\n", memory_pool_id);
 
     ret = RK_MPI_VENC_DestroyChn(channel_id);
     if (ret != RK_SUCCESS)
