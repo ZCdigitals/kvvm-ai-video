@@ -47,6 +47,10 @@ int parse_args(int argc, char *argv[], args_t *args)
 {
     int opt;
 
+    // init values
+    args->input_path = NULL;
+    args->output_path = NULL;
+
     // 使用getopt_long支持长选项
     static struct option long_options[] = {
         {"width", required_argument, 0, 'w'},
@@ -54,7 +58,7 @@ int parse_args(int argc, char *argv[], args_t *args)
         {"input", required_argument, 0, 'i'},
         {"output", required_argument, 0, 'o'},
         {"help", no_argument, 0, 0},
-        {"version", no_argument, 0, -2},
+        {"version", no_argument, 0, 'v'},
         {0, 0, 0, 0}};
 
     while ((opt = getopt_long(argc, argv, "w:h:i:o:", long_options, NULL)) != -1)
@@ -97,12 +101,12 @@ int parse_args(int argc, char *argv[], args_t *args)
             print_help();
             args->help_flag = true;
             break;
-        case -2:
+        case 'v':
             print_version();
             args->version_flag = true;
             break;
         default:
-            return -1;
+            break;
         }
     }
 
@@ -111,6 +115,12 @@ int parse_args(int argc, char *argv[], args_t *args)
 
 void destroy_args(args_t *args)
 {
-    free(args->input_path);
-    free(args->output_path);
+    if (args->input_path != NULL)
+    {
+        free(args->input_path);
+    }
+    if (args->output_path != NULL)
+    {
+        free(args->output_path);
+    }
 }
