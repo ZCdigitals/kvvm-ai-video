@@ -111,6 +111,12 @@ int parse_args(int argc, char *argv[], args_t *args)
 
 void destroy_args(args_t *args)
 {
-    free(args->input_path);
-    free(args->output_path);
+    if (args->input_path != NULL)
+    {
+        free(args->input_path);
+    }
+    if (args->output_path != NULL)
+    {
+        free(args->output_path);
+    }
 }
