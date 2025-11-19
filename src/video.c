@@ -21,7 +21,7 @@
 
 #include "utils.h"
 
-int calculate_venc(unsigned int width, unsigned int height, MB_PIC_CAL_S *mb_pic_cal)
+int calculate_venc(uint32_t width, uint32_t height, MB_PIC_CAL_S *mb_pic_cal)
 {
 
     PIC_BUF_ATTR_S pic_buf_attr;
@@ -43,7 +43,7 @@ int calculate_venc(unsigned int width, unsigned int height, MB_PIC_CAL_S *mb_pic
     return 0;
 }
 
-int init_venc(int channel_id, unsigned int width, unsigned int height, unsigned int bit_rate, unsigned int gop, unsigned int buffer_count, MB_PIC_CAL_S mb_pic_cal)
+int init_venc(int32_t channel_id, uint32_t width, uint32_t height, uint32_t bit_rate, uint32_t gop, uint32_t buffer_count, MB_PIC_CAL_S mb_pic_cal)
 {
     int32_t ret = RK_MPI_SYS_Init();
     if (ret != RK_SUCCESS)
@@ -86,7 +86,7 @@ int init_venc(int channel_id, unsigned int width, unsigned int height, unsigned 
     return 0;
 }
 
-unsigned int init_venc_memory(unsigned int buffer_count, MB_PIC_CAL_S mb_pic_cal)
+uint32_t init_venc_memory(uint32_t buffer_count, MB_PIC_CAL_S mb_pic_cal)
 {
     // init memory pool
     MB_POOL_CONFIG_S memory_pool_config;
@@ -96,7 +96,7 @@ unsigned int init_venc_memory(unsigned int buffer_count, MB_PIC_CAL_S mb_pic_cal
     memory_pool_config.enAllocType = MB_ALLOC_TYPE_DMA;
     memory_pool_config.bPreAlloc = RK_TRUE;
 
-    unsigned int memory_pool_id = RK_MPI_MB_CreatePool(&memory_pool_config);
+    uint32_t memory_pool_id = RK_MPI_MB_CreatePool(&memory_pool_config);
     if (memory_pool_id == MB_INVALID_POOLID)
     {
         errno = -1;
@@ -108,9 +108,9 @@ unsigned int init_venc_memory(unsigned int buffer_count, MB_PIC_CAL_S mb_pic_cal
     return memory_pool_id;
 }
 
-void destroy_venc(int channel_id, unsigned int memory_pool_id)
+void destroy_venc(int32_t channel_id, uint32_t memory_pool_id)
 {
-    int ret = RK_MPI_MB_DestroyPool(memory_pool_id);
+    int32_t ret = RK_MPI_MB_DestroyPool(memory_pool_id);
     if (ret != RK_SUCCESS)
     {
         errno = ret;
@@ -135,12 +135,12 @@ void destroy_venc(int channel_id, unsigned int memory_pool_id)
     printf("mpi exit ok\n");
 }
 
-int start_venc(int channel_id)
+int start_venc(int32_t channel_id)
 {
     VENC_RECV_PIC_PARAM_S receive_param;
     memset(&receive_param, 0, sizeof(VENC_RECV_PIC_PARAM_S));
     receive_param.s32RecvPicNum = -1;
-    int ret = RK_MPI_VENC_StartRecvFrame(channel_id, &receive_param);
+    int32_t ret = RK_MPI_VENC_StartRecvFrame(channel_id, &receive_param);
     if (ret != RK_SUCCESS)
     {
         errno = ret;
@@ -152,9 +152,9 @@ int start_venc(int channel_id)
     return 0;
 }
 
-int stop_venc(int channel_id)
+int stop_venc(int32_t channel_id)
 {
-    int ret = RK_MPI_VENC_StopRecvFrame(channel_id);
+    int32_t ret = RK_MPI_VENC_StopRecvFrame(channel_id);
     if (ret != RK_SUCCESS)
     {
         errno = ret;
@@ -306,7 +306,7 @@ int stop_v4l2(int fd)
     return 0;
 }
 
-int allocate_buffers(unsigned int memory_pool_id, int video_fd, unsigned int buffer_count, void *blocks[])
+int allocate_buffers(uint32_t memory_pool_id, int video_fd, unsigned int buffer_count, void *blocks[])
 {
     for (unsigned int i = 0; i < buffer_count; i += 1)
     {
@@ -342,7 +342,7 @@ int allocate_buffers(unsigned int memory_pool_id, int video_fd, unsigned int buf
         printf("mpi memory get block %d ok\n", i);
 
         // get block fd
-        int block_fd = RK_MPI_MB_Handle2Fd(blocks[i]);
+        int32_t block_fd = RK_MPI_MB_Handle2Fd(blocks[i]);
         if (block_fd == -1)
         {
             errno = -1;
@@ -370,7 +370,7 @@ int free_buffers(unsigned int buffer_count, void *blocks[])
 {
     for (unsigned int i = 0; i < buffer_count; i += 1)
     {
-        int ret = RK_MPI_MB_ReleaseMB(blocks[i]);
+        int32_t ret = RK_MPI_MB_ReleaseMB(blocks[i]);
         if (ret != RK_SUCCESS)
         {
             errno = ret;
@@ -383,7 +383,7 @@ int free_buffers(unsigned int buffer_count, void *blocks[])
     return 0;
 }
 
-int input(int venc_channel_id, int video_fd, unsigned int width, unsigned int height, unsigned int vir_width, unsigned int vir_height, bool is_end, int timeout)
+int input(int32_t venc_channel_id, int video_fd, uint32_t width, uint32_t height, uint32_t vir_width, uint32_t vir_height, bool is_end, int32_t timeout)
 {
     struct v4l2_buffer buf;
     struct v4l2_plane plane;
@@ -395,7 +395,7 @@ int input(int venc_channel_id, int video_fd, unsigned int width, unsigned int he
     buf.length = 1;
     buf.m.planes = &plane;
 
-    int ret = ioctl(video_fd, VIDIOC_DQBUF, &buf);
+    int32_t ret = ioctl(video_fd, VIDIOC_DQBUF, &buf);
     if (ret == -1)
     {
         perror("video device dequeue buffer error");
@@ -412,7 +412,7 @@ int input(int venc_channel_id, int video_fd, unsigned int width, unsigned int he
         return -1;
     }
 
-    // there is no need to flush cache, but i do not known why
+    // there is no need to flush cache, but i do not know why
     // in `test_mpi_venc.cpp`, they have this step
     // int32_t ret = RK_MPI_SYS_MmzFlushCache(block, RK_FALSE);
     // if (ret != RK_SUCCESS)
@@ -458,9 +458,9 @@ int input(int venc_channel_id, int video_fd, unsigned int width, unsigned int he
     return 0;
 }
 
-int output(int venc_channel_id, VENC_STREAM_S *stream, int timeout, output_data_callback callback, void *callback_context)
+int output(int32_t venc_channel_id, VENC_STREAM_S *stream, int32_t timeout, output_data_callback callback, void *callback_context)
 {
-    int ret = RK_MPI_VENC_GetStream(venc_channel_id, stream, timeout);
+    int32_t ret = RK_MPI_VENC_GetStream(venc_channel_id, stream, timeout);
     if (ret != RK_SUCCESS)
     {
         errno = ret;
@@ -469,7 +469,7 @@ int output(int venc_channel_id, VENC_STREAM_S *stream, int timeout, output_data_
     }
     // printf("mpi venc get stream ok %d %d\n", stream->u32Seq, stream->pstPack->u64PTS);
 
-    unsigned int size = stream->pstPack->u32Len;
+    uint32_t size = stream->pstPack->u32Len;
     // read to destnation
     void *dst = RK_MPI_MB_Handle2VirAddr(stream->pstPack->pMbBlk);
 

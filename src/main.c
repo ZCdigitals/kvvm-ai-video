@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,13 +26,8 @@
 // output socket path
 // #define OUTPUT_PATH "/var/run/capture.sock"
 
-int null_data_callback(void *data, unsigned int size)
-{
-    return 0;
-}
-
 // running
-static volatile int keep_running = 1;
+static volatile uint32_t keep_running = 1;
 
 /**
  * stop running
@@ -48,7 +44,7 @@ typedef struct
     uint32_t height;
 } output_callback_context_t;
 
-int output_callback(unsigned int frame_id, unsigned long long int time, void *data, unsigned int size, void *user_data)
+int output_callback(uint32_t frame_id, uint64_t time, void *data, uint32_t size, void *user_data)
 {
     if (user_data == NULL)
     {
@@ -62,12 +58,12 @@ int output_callback(unsigned int frame_id, unsigned long long int time, void *da
 
 typedef struct
 {
-    int venc_channel_id;
+    int32_t venc_channel_id;
     int video_fd;
-    unsigned int width;
-    unsigned int height;
-    unsigned int vir_width;
-    unsigned int vir_height;
+    uint32_t width;
+    uint32_t height;
+    uint32_t vir_width;
+    uint32_t vir_height;
 } input_args_t;
 
 void *input_loop(void *arg)
@@ -96,10 +92,10 @@ void *input_loop(void *arg)
 
 typedef struct
 {
+    int32_t venc_channel_id;
     int socket_fd;
-    int venc_channel_id;
-    unsigned int width;
-    unsigned int height;
+    uint32_t width;
+    uint32_t height;
 } output_args_t;
 
 void *output_loop(void *arg)
@@ -144,7 +140,7 @@ void *output_loop(void *arg)
     return NULL;
 }
 
-int main_video(unsigned int video_width, unsigned int video_height, char *input_path, char *output_path)
+int main_video(uint32_t video_width, uint32_t video_height, char *input_path, char *output_path)
 {
     // regist signal
     signal(SIGINT, stop_running);
@@ -271,7 +267,8 @@ int main(int argc, char *argv[])
     int ret = parse_args(argc, argv, &args);
     if (args.help_flag || args.version_flag)
     {
-        return 0;
+        // do nothing
+        ;
     }
     else
     {

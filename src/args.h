@@ -2,11 +2,12 @@
 #define ARGS_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct
 {
-    unsigned int width;
-    unsigned int height;
+    uint32_t width;
+    uint32_t height;
     char *input_path;
     char *output_path;
     bool help_flag;
