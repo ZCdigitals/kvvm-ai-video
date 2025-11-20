@@ -9,14 +9,19 @@
 
 #include "version.h"
 
+#define DEFAULT_BIT_RATE 10 * 1024
+#define DEFAULT_GOP 60
+
 void print_help()
 {
-    printf("Usage: -w <width> -h <height> -i <input path> -o <output path>\n");
+    printf("Usage: -w <width> -h <height> -i <input path> -o <output path> -b <bit_rate> -g <gop>\n");
     printf("Required args:\n");
-    printf("    -w <pixel>  Must be greater than 0\n");
-    printf("    -h <pixel>  Must be greater than 0\n");
-    printf("    -i <path>   Input device path, eg. `/dev/video0`\n");
-    printf("    -o <path>   Output socket path, eg. `/var/run/capture.sock`\n");
+    printf("    -w <pixel>   Must be greater than 0\n");
+    printf("    -h <pixel>   Must be greater than 0\n");
+    printf("    -i <path>    Input device path, eg. `/dev/video0`\n");
+    printf("    -o <path>    Output socket path, eg. `/var/run/capture.sock`\n");
+    printf("    -b <number>  Encoder bit rate, default is `10240`\n");
+    printf("    -g <number>  Encode group of pictures, default is `60`\n");
 }
 
 void print_version()
@@ -48,8 +53,12 @@ int parse_args(int argc, char *argv[], args_t *args)
     int opt;
 
     // init values
+    args->width = 0;
+    args->height = 0;
     args->input_path = NULL;
     args->output_path = NULL;
+    args->bit_rate = DEFAULT_BIT_RATE;
+    args->gop = DEFAULT_GOP;
 
     // 使用getopt_long支持长选项
     static struct option long_options[] = {
@@ -57,6 +66,8 @@ int parse_args(int argc, char *argv[], args_t *args)
         {"height", required_argument, 0, 'h'},
         {"input", required_argument, 0, 'i'},
         {"output", required_argument, 0, 'o'},
+        {"bit-rate", required_argument, 0, 'b'},
+        {"gop", required_argument, 0, 'g'},
         {"help", no_argument, 0, 0},
         {"version", no_argument, 0, 'v'},
         {0, 0, 0, 0}};
@@ -66,10 +77,10 @@ int parse_args(int argc, char *argv[], args_t *args)
         switch (opt)
         {
         case 'w':
-            args->width = (unsigned int)strtoul(optarg, NULL, 10);
+            args->width = (uint32_t)strtoul(optarg, NULL, 10);
             break;
         case 'h':
-            args->height = (unsigned int)strtoul(optarg, NULL, 10);
+            args->height = (uint32_t)strtoul(optarg, NULL, 10);
             break;
         case 'i':
         {
@@ -97,6 +108,12 @@ int parse_args(int argc, char *argv[], args_t *args)
             args->output_path = op;
             break;
         }
+        case 'b':
+            args->bit_rate = (uint32_t)strtoul(optarg, NULL, 10);
+            break;
+        case 'g':
+            args->gop = (uint32_t)strtoul(optarg, NULL, 10);
+            break;
         case 0:
             print_help();
             args->help_flag = true;
@@ -108,6 +125,38 @@ int parse_args(int argc, char *argv[], args_t *args)
         default:
             break;
         }
+    }
+
+    // valid args
+    if (args->width == 0 || args->width > 8192)
+    {
+        printf("width must be in (0,8192], get %d\n", args->width);
+        return -1;
+    }
+    else if (args->height == 0 || args->height > 8192)
+    {
+        printf("height must be in (0,8192], get %d\n", args->height);
+        return -1;
+    }
+    else if (args->input_path == NULL)
+    {
+        printf("input path is required\n");
+        return -1;
+    }
+    else if (args->output_path == NULL)
+    {
+        printf("output path is required\n");
+        return -1;
+    }
+    else if (args->bit_rate == 0)
+    {
+        printf("bit rate must be greater than 0\n");
+        return -1;
+    }
+    else if (args->gop == 0)
+    {
+        printf("gop must be greater than 0\n");
+        return -1;
     }
 
     return 0;

@@ -10,6 +10,8 @@ typedef struct
     uint32_t height;
     char *input_path;
     char *output_path;
+    uint32_t bit_rate;
+    uint32_t gop;
     bool help_flag;
     bool version_flag;
 } args_t;

@@ -14,10 +14,11 @@
 #include "video.h"
 
 #define VENC_CHANNEL 0
-#define BIT_RATE 10 * 1024
-#define GOP 60
 // venc send frame timeout, venc get stream timeout
 #define TIMEOUT 1000
+// i dont know why stream output buffer count is 8
+// in `test_mpi_venc.cpp`, they use 8
+#define STREAM_OUTPUT_BUFFER_COUNT 8
 
 // video device path
 // #define VIDEO_PATH "/dev/video0"
@@ -140,7 +141,7 @@ void *output_loop(void *arg)
     return NULL;
 }
 
-int main_video(uint32_t video_width, uint32_t video_height, char *input_path, char *output_path)
+int main_video(uint32_t video_width, uint32_t video_height, char *input_path, char *output_path, uint32_t bit_rate, uint32_t gop)
 {
     // regist signal
     signal(SIGINT, stop_running);
@@ -165,9 +166,7 @@ int main_video(uint32_t video_width, uint32_t video_height, char *input_path, ch
     printf("manual calculate ok %d %d %d\n", cal.u32VirWidth, cal.u32VirHeight, cal.u32MBSize);
 
     // init venc
-    // i dont know why stream output buffer count is 8
-    // in `test_mpi_venc.cpp`, they use 8
-    int ret = init_venc(VENC_CHANNEL, video_width, video_height, BIT_RATE, GOP, 8, cal);
+    int ret = init_venc(VENC_CHANNEL, video_width, video_height, bit_rate, gop, STREAM_OUTPUT_BUFFER_COUNT, cal);
     if (ret == -1)
     {
         goto destroy_socket;
@@ -265,7 +264,13 @@ int main(int argc, char *argv[])
 {
     args_t args;
     int ret = parse_args(argc, argv, &args);
-    if (args.help_flag || args.version_flag)
+
+    if (ret == -1)
+    {
+        // do nothing
+        ;
+    }
+    else if (args.help_flag || args.version_flag)
     {
         // do nothing
         ;
@@ -273,7 +278,7 @@ int main(int argc, char *argv[])
     else
     {
         printf("start %d %d %s %s\n", args.width, args.height, args.input_path, args.output_path);
-        ret = main_video(args.width, args.height, args.input_path, args.output_path);
+        ret = main_video(args.width, args.height, args.input_path, args.output_path, args.bit_rate, args.gop);
     }
 
     destroy_args(&args);
