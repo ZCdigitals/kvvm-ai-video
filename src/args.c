@@ -53,10 +53,9 @@ int parse_args(int argc, char *argv[], args_t *args)
     int opt;
 
     // init values
-    args->width = 0;
-    args->height = 0;
-    args->input_path = NULL;
-    args->output_path = NULL;
+    memset(&args, 0, sizeof(args_t));
+
+    // set default values
     args->bit_rate = DEFAULT_BIT_RATE;
     args->gop = DEFAULT_GOP;
 
