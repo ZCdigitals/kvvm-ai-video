@@ -53,7 +53,7 @@ int parse_args(int argc, char *argv[], args_t *args)
     int opt;
 
     // init values
-    memset(&args, 0, sizeof(args_t));
+    memset(args, 0, sizeof(args_t));
 
     // set default values
     args->bit_rate = DEFAULT_BIT_RATE;
@@ -71,7 +71,7 @@ int parse_args(int argc, char *argv[], args_t *args)
         {"version", no_argument, 0, 'v'},
         {0, 0, 0, 0}};
 
-    while ((opt = getopt_long(argc, argv, "w:h:i:o:", long_options, NULL)) != -1)
+    while ((opt = getopt_long(argc, argv, "w:h:i:o:b:g:", long_options, NULL)) != -1)
     {
         switch (opt)
         {
@@ -127,7 +127,11 @@ int parse_args(int argc, char *argv[], args_t *args)
     }
 
     // valid args
-    if (args->width == 0 || args->width > 8192)
+    if (args->help_flag || args->version_flag)
+    {
+        return 0;
+    }
+    else if (args->width == 0 || args->width > 8192)
     {
         printf("width must be in (0,8192], get %d\n", args->width);
         return -1;

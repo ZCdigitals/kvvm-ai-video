@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        printf("start %d %d %s %s\n", args.width, args.height, args.input_path, args.output_path);
+        printf("start %d %d %s %s\n", args.width, args.height, args.input_path, args.output_path, args.bit_rate, args.gop);
         ret = main_video(args.width, args.height, args.input_path, args.output_path, args.bit_rate, args.gop);
     }
 
