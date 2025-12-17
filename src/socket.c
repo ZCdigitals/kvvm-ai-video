@@ -80,10 +80,10 @@ int send_frame(int fd, uint32_t id, uint64_t time, uint32_t width, uint32_t heig
     }
 
     // send data
-    uint32_t data_sent = 0;
+    ssize_t data_sent = 0;
     while (data_sent < size)
     {
-        uint32_t st = send(fd, (char *)data + data_sent, size - data_sent, MSG_NOSIGNAL);
+        ssize_t st = send(fd, (char *)data + data_sent, size - data_sent, MSG_NOSIGNAL);
         if (st == -1)
         {
             perror("socket send data error");
