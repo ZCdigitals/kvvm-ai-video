@@ -5,7 +5,6 @@
 #include <string.h>
 
 #include <sys/socket.h>
-#include <sys/time.h>
 #include <sys/un.h>
 
 #include <unistd.h>
@@ -58,9 +57,6 @@ int init_socket(const char *path)
 
 int send_frame(int fd, uint32_t id, uint64_t time, uint32_t width, uint32_t height, void *data, uint32_t size)
 {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-
     frame_header header = {
         .id = id,
         .width = width,
