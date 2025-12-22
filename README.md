@@ -23,7 +23,7 @@ docker run -it --rm -v .:/app builder:luckfox-pico /app/build.sh
 
 Lib files are copied from `luckfox-pico`.
 
--   `libs/rockit`, copied from `<path to luckfox-pico>/media/rockit/out`
+-   `include`, copied from `<path to luckfox-pico>/media/rockit/out/include`
 
 ## Utils
 
