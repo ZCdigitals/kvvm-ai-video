@@ -14,19 +14,19 @@
 typedef struct
 {
     uint32_t id;
-    uint32_t width;
-    uint32_t height;
-    /**
-     * - 0, nv12
-     *
-     * only support nv12
-     */
-    uint32_t format;
-    // in ms
-    uint64_t time;
     uint32_t size;
-    uint32_t reserved;
-} frame_header;
+    uint64_t timestamp;
+    uint32_t reserved0;
+    uint32_t reserved1;
+    uint32_t reserved2;
+    uint32_t reserved3;
+    uint32_t reserved4;
+    uint32_t reserved5;
+    uint32_t reserved6;
+    uint32_t reserved7;
+} socket_header_t;
+
+#define SOCKET_HEADER_SIZE sizeof(socket_header_t)
 
 int init_socket(const char *path)
 {
@@ -57,19 +57,15 @@ int init_socket(const char *path)
 
 int send_frame(int fd, uint32_t id, uint64_t time, uint32_t width, uint32_t height, void *data, uint32_t size)
 {
-    frame_header header = {
+    socket_header_t header = {
         .id = id,
-        .width = width,
-        .height = height,
-        .format = 0,
-        .time = time,
         .size = size,
-        .reserved = 0,
+        .timestamp = time,
     };
 
     // send header
-    ssize_t sent = send(fd, &header, sizeof(header), MSG_NOSIGNAL);
-    if (sent != sizeof(header))
+    ssize_t sent = send(fd, &header, SOCKET_HEADER_SIZE, MSG_NOSIGNAL);
+    if (sent != SOCKET_HEADER_SIZE)
     {
         perror("socket send header error");
         return -1;
