@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <sys/prctl.h>
+
 #include <pthread.h>
 
 #include "rk_comm_video.h"
@@ -262,6 +264,8 @@ destroy_socket:
 
 int main(int argc, char *argv[])
 {
+    prctl(PR_SET_PDEATHSIG, SIGTERM);
+
     args_t args;
     int ret = parse_args(argc, argv, &args);
 
