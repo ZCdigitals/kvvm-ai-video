@@ -3,6 +3,7 @@ project(video C)
 
 option(BUILD_ENC_TEST "build enc test" OFF)
 option(BUILD_V4L2_TEST "build V4L2 test" OFF)
+option(BUILD_DMA_TEST "build DMA test" OFF)
 option(BUILD_V4L2_ENC_TEST "build unit v4l2 enc test" OFF)
 option(BUILD_V4L2_QUERY_SIZE_TEST "build v4l2 query size test" OFF)
 option(BUILD_UNIT_SOCKET_TEST "build unit socket test" OFF)
@@ -13,7 +14,7 @@ if(BUILD_V4L2_ENC_TEST OR BUILD_MAIN)
     find_package(Threads REQUIRED)
 endif()
 
-if(BUILD_ENC_TEST OR BUILD_V4L2_ENC_TEST OR BUILD_MAIN)
+if(BUILD_ENC_TEST OR BUILD_V4L2_ENC_TEST OR BUILD_DMA_TEST OR BUILD_MAIN)
     # find lib
     find_library(ROCKIT_LIB
         NAMES rockit librockit.so librockit.a
@@ -104,6 +105,18 @@ if(BUILD_UNIT_SOCKET_TEST)
     )
     target_include_directories(unit_socket_test PRIVATE
         ${PROJECT_SOURCE_DIR}/src
+    )
+endif()
+
+if(BUILD_DMA_TEST)
+    add_executable(
+        dma_test
+        "tests/dma_test.c"
+    )
+    target_link_libraries(dma_test PRIVATE
+        ${ROCKIT_LIB}
+        ${ROCKCHIP_MPP_LIB}
+        ${RGA_LIB}
     )
 endif()
 
