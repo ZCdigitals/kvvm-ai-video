@@ -479,7 +479,7 @@ int output(int32_t venc_channel_id, VENC_STREAM_S *stream, int32_t timeout, outp
     // read to destnation
     void *dst = RK_MPI_MB_Handle2VirAddr(stream->pstPack->pMbBlk);
 
-    callback(stream->u32Seq, stream->pstPack->u64PTS, dst, size, callback_context);
+    int ret2 = callback(stream->u32Seq, stream->pstPack->u64PTS, dst, size, callback_context);
 
     // release stream
     ret = RK_MPI_VENC_ReleaseStream(venc_channel_id, stream);
@@ -491,5 +491,5 @@ int output(int32_t venc_channel_id, VENC_STREAM_S *stream, int32_t timeout, outp
     }
     // printf("mpi venc release stream ok\n");
 
-    return 0;
+    return ret2;
 }
