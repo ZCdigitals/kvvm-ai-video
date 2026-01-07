@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <linux/videodev2.h>
+
 #include "rk_comm_video.h"
 #include "rk_mpi_venc.h"
 
