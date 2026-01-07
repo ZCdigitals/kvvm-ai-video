@@ -64,7 +64,7 @@ int init_venc(int32_t channel_id, uint32_t width, uint32_t height, uint32_t bit_
     venc_attr.stVencAttr.u32VirWidth = width;
     venc_attr.stVencAttr.u32VirHeight = height;
     venc_attr.stVencAttr.u32StreamBufCnt = buffer_count;
-    venc_attr.stVencAttr.u32BufSize = width * height * 3 / 2;
+    venc_attr.stVencAttr.u32BufSize = calculate_pic_byte_size(width, height, V4L2_COLOR);
 
     // set h264 struct props
     venc_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264CBR;
