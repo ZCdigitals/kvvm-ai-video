@@ -158,14 +158,17 @@ int main_video(uint32_t video_width, uint32_t video_height, char *input_path, ch
 
     // calculate size
     MB_PIC_CAL_S cal;
+    // auto calculate
+    // on new hardware, the v4l2 cloud stride correctly. i have no idea why
+    calculate_venc(video_width, video_height, &cal);
+
     // 1920 1080 will be strided to 1920 1088
     // but v4l2 dma can not fill all byes, then venc think the frame is not end and will not work at all
     // that is why we should calculate manually
-    // calculate_venc(video_width, video_height, &cal);
-    cal.u32VirWidth = video_width;
-    cal.u32VirHeight = video_height;
-    cal.u32MBSize = video_width * video_height * 3 / 2;
-    printf("manual calculate ok %d %d %d\n", cal.u32VirWidth, cal.u32VirHeight, cal.u32MBSize);
+    // cal.u32VirWidth = video_width;
+    // cal.u32VirHeight = video_height;
+    // cal.u32MBSize = video_width * video_height * 3 / 2;
+    // printf("manual calculate ok %d %d %d\n", cal.u32VirWidth, cal.u32VirHeight, cal.u32MBSize);
 
     // init venc
     int ret = init_venc(VENC_CHANNEL, video_width, video_height, bit_rate, gop, STREAM_OUTPUT_BUFFER_COUNT, cal);

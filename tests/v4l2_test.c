@@ -105,10 +105,10 @@ int main()
     fmt.fmt.pix_mp.height = VIDEO_HEIGHT;
     fmt.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12;
     fmt.fmt.pix_mp.field = V4L2_FIELD_NONE;
-    fmt.fmt.pix_mp.num_planes = 1;
+    // fmt.fmt.pix_mp.num_planes = 1;
 
-    fmt.fmt.pix_mp.plane_fmt[0].bytesperline = VIDEO_WIDTH;
-    fmt.fmt.pix_mp.plane_fmt[0].sizeimage = VIDEO_WIDTH * VIDEO_HEIGHT * 3 / 2;
+    // fmt.fmt.pix_mp.plane_fmt[0].bytesperline = VIDEO_WIDTH;
+    // fmt.fmt.pix_mp.plane_fmt[0].sizeimage = VIDEO_WIDTH * VIDEO_HEIGHT * 3 / 2;
     // fmt.fmt.pix_mp.plane_fmt[1].bytesperline = VIDEO_WIDTH;
     // fmt.fmt.pix_mp.plane_fmt[1].sizeimage = VIDEO_WIDTH * VIDEO_HEIGHT / 2;
 

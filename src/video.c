@@ -63,10 +63,10 @@ int init_venc(int32_t channel_id, uint32_t width, uint32_t height, uint32_t bit_
     venc_attr.stVencAttr.u32Profile = H264E_PROFILE_MAIN;
     venc_attr.stVencAttr.u32PicWidth = width;
     venc_attr.stVencAttr.u32PicHeight = height;
-    venc_attr.stVencAttr.u32VirWidth = mb_pic_cal.u32VirWidth;
-    venc_attr.stVencAttr.u32VirHeight = mb_pic_cal.u32VirHeight;
+    venc_attr.stVencAttr.u32VirWidth = width;
+    venc_attr.stVencAttr.u32VirHeight = height;
     venc_attr.stVencAttr.u32StreamBufCnt = buffer_count;
-    venc_attr.stVencAttr.u32BufSize = mb_pic_cal.u32MBSize;
+    venc_attr.stVencAttr.u32BufSize = width * height * 3 / 2;
 
     // set h264 struct props
     venc_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264CBR;
@@ -218,13 +218,11 @@ int init_v4l2(const char *path, unsigned int width, unsigned int height)
     fmt.fmt.pix_mp.width = width;
     fmt.fmt.pix_mp.height = height;
     fmt.fmt.pix_mp.pixelformat = V4L2_COLOR;
-    fmt.fmt.pix_mp.field = V4L2_FIELD_NONE;
+    fmt.fmt.pix_mp.field = V4L2_FIELD_ANY;
     // fmt.fmt.pix_mp.num_planes = 1;
 
     // fmt.fmt.pix_mp.plane_fmt[0].bytesperline = width;
-    // fmt.fmt.pix_mp.plane_fmt[0].sizeimage = width * height;
-    // fmt.fmt.pix_mp.plane_fmt[1].bytesperline = width;
-    // fmt.fmt.pix_mp.plane_fmt[1].sizeimage = width * height / 2;
+    // fmt.fmt.pix_mp.plane_fmt[0].sizeimage = width * height * 3 / 2;
 
     ret = ioctl(fd, VIDIOC_S_FMT, &fmt);
     if (ret == -1)
@@ -335,7 +333,7 @@ int allocate_buffers(uint32_t memory_pool_id, int video_fd, unsigned int buffer_
             perror("video device query buffer error");
             return -1;
         }
-        printf("video device query buffer %d ok\n", i);
+        printf("video device query buffer %d ok %d\n", i, plane.length);
 
         // get mpi block
         blocks[i] = RK_MPI_MB_GetMB(memory_pool_id, plane.length, RK_TRUE);
@@ -434,8 +432,8 @@ int input(int32_t venc_channel_id, int video_fd, uint32_t width, uint32_t height
     frame.stVFrame.pMbBlk = block;
     frame.stVFrame.u32Width = width;
     frame.stVFrame.u32Height = height;
-    frame.stVFrame.u32VirWidth = vir_width;
-    frame.stVFrame.u32VirHeight = vir_height;
+    frame.stVFrame.u32VirWidth = width;
+    frame.stVFrame.u32VirHeight = height;
     frame.stVFrame.enPixelFormat = RK_COLOR;
 
     frame.stVFrame.u32TimeRef = buf.sequence;

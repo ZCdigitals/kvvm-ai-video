@@ -3,6 +3,7 @@ project(video C)
 
 option(BUILD_ENC_TEST "build enc test" OFF)
 option(BUILD_V4L2_TEST "build V4L2 test" OFF)
+option(BUILD_V4L2_FMT_TEST "build V4L2 test" OFF)
 option(BUILD_DMA_TEST "build DMA test" OFF)
 option(BUILD_V4L2_ENC_TEST "build unit v4l2 enc test" OFF)
 option(BUILD_V4L2_QUERY_SIZE_TEST "build v4l2 query size test" OFF)
@@ -53,6 +54,14 @@ if(BUILD_V4L2_TEST)
     add_executable(
         v4l2_test
         "tests/v4l2_test.c"
+    )
+endif()
+
+if(BUILD_V4L2_FMT_TEST)
+    # build v4l2 fmt test
+    add_executable(
+        v4l2_fmt_test
+        "tests/v4l2_fmt_test.c"
     )
 endif()
 

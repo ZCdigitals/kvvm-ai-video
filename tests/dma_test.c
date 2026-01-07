@@ -18,13 +18,14 @@
 #include "rk_type.h"
 
 #define BUFFER_COUNT 4
+#define PLANE_LENGTH 1920 * 1088 * 3 / 2
 
 uint32_t init_memory(uint32_t buffer_count)
 {
     // init memory pool
     MB_POOL_CONFIG_S memory_pool_config;
     memset(&memory_pool_config, 0, sizeof(MB_POOL_CONFIG_S));
-    memory_pool_config.u64MBSize = 1920 * 1080 * 3 / 2;
+    memory_pool_config.u64MBSize = PLANE_LENGTH;
     memory_pool_config.u32MBCnt = buffer_count;
     memory_pool_config.enAllocType = MB_ALLOC_TYPE_DMA;
     memory_pool_config.bPreAlloc = RK_TRUE;
@@ -63,7 +64,7 @@ int allocate_buffers(uint32_t memory_pool_id, unsigned int buffer_count, void *b
     for (unsigned int i = 0; i < buffer_count; i += 1)
     {
         // get mpi block
-        blocks[i] = RK_MPI_MB_GetMB(memory_pool_id, 1, RK_TRUE);
+        blocks[i] = RK_MPI_MB_GetMB(memory_pool_id, PLANE_LENGTH, RK_TRUE);
         if (blocks[i] == RK_NULL)
         {
             errno = -1;

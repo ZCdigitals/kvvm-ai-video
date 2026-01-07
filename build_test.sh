@@ -8,7 +8,7 @@ cd $DST_DIR
 
 # configure
 cmake \
-    -DBUILD_DMA_TEST=ON \
+    -DBUILD_V4L2_TEST=ON \
     -DBUILD_MAIN=OFF \
     -DCMAKE_TOOLCHAIN_FILE=/workspace/toolchain.cmake ..
 
