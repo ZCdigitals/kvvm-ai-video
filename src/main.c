@@ -192,7 +192,8 @@ int main_video(uint32_t video_width, uint32_t video_height, char *input_path, ch
         goto destroy_v4l2;
     }
 
-    void *blocks[BUFFER_COUNT];
+    // nv12 has 2 planes
+    void *blocks[BUFFER_COUNT * 2];
     ret = allocate_buffers(memory_pool, video_fd, buffer_count, blocks);
     if (ret == -1)
     {

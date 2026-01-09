@@ -21,6 +21,8 @@
 
 #include "utils.h"
 
+#define PLANES 2
+
 int calculate_venc(uint32_t width, uint32_t height, MB_PIC_CAL_S *mb_pic_cal)
 {
 
@@ -316,15 +318,15 @@ int allocate_buffers(uint32_t memory_pool_id, int video_fd, unsigned int buffer_
     {
         // use v4l2 buffer
         struct v4l2_buffer buf;
-        struct v4l2_plane plane;
+        struct v4l2_plane planes[PLANES];
 
         memset(&buf, 0, sizeof(buf));
-        memset(&plane, 0, sizeof(plane));
+        memset(&planes, 0, sizeof(planes));
         buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
         buf.memory = V4L2_MEMORY_DMABUF;
         buf.index = i;
         buf.length = 1;
-        buf.m.planes = &plane;
+        buf.m.planes = &planes;
 
         // although we use dma, query buffer is also necessary, this will init plane
         int ret = ioctl(video_fd, VIDIOC_QUERYBUF, &buf);
@@ -333,30 +335,55 @@ int allocate_buffers(uint32_t memory_pool_id, int video_fd, unsigned int buffer_
             perror("video device query buffer error");
             return -1;
         }
-        printf("video device query buffer %d ok %d\n", i, plane.length);
+        printf("video device query buffer %d ok %d %d\n", i, planes[0].length, planes[1].length);
 
-        // get mpi block
-        blocks[i] = RK_MPI_MB_GetMB(memory_pool_id, plane.length, RK_TRUE);
-        if (blocks[i] == RK_NULL)
+        // get mpi block plane 0
+        unsigned int bi = i * 2;
+        blocks[bi] = RK_MPI_MB_GetMB(memory_pool_id, planes[0].length, RK_TRUE);
+        if (blocks[bi] == RK_NULL)
         {
             errno = -1;
             perror("mpi memory get block error");
             return -1;
         }
-        printf("mpi memory get block %d ok\n", i);
+        printf("mpi memory get block %d %dok\n", i, 0);
 
         // get block fd
-        int32_t block_fd = RK_MPI_MB_Handle2Fd(blocks[i]);
+        int32_t block_fd = RK_MPI_MB_Handle2Fd(blocks[bi]);
         if (block_fd == -1)
         {
             errno = -1;
             perror("mpi memory get block fd error");
             return -1;
         }
-        printf("mpi memory get block %d ok\n", i);
+        printf("mpi memory get block %d %dok\n", i, 0);
 
-        // set block fd to plane
-        plane.m.fd = block_fd;
+        // set block fd to plane 0
+        planes[0].m.fd = block_fd;
+
+        // get mpi block plane 1
+        bi += 1;
+        blocks[bi] = RK_MPI_MB_GetMB(memory_pool_id, planes[1].length, RK_TRUE);
+        if (blocks[bi] == RK_NULL)
+        {
+            errno = -1;
+            perror("mpi memory get block error");
+            return -1;
+        }
+        printf("mpi memory get block %d %dok\n", i, 1);
+
+        // get block fd
+        block_fd = RK_MPI_MB_Handle2Fd(blocks[bi]);
+        if (block_fd == -1)
+        {
+            errno = -1;
+            perror("mpi memory get block fd error");
+            return -1;
+        }
+        printf("mpi memory get block %d %dok\n", i, 1);
+
+        // set block fd to plane 1
+        planes[1].m.fd = block_fd;
 
         ret = ioctl(video_fd, VIDIOC_QBUF, &buf);
         if (ret == -1)
@@ -374,13 +401,26 @@ int free_buffers(unsigned int buffer_count, void *blocks[])
 {
     for (unsigned int i = 0; i < buffer_count; i += 1)
     {
-        int32_t ret = RK_MPI_MB_ReleaseMB(blocks[i]);
+        // release block plane 0
+        unsigned int bi = i * 2;
+        int32_t ret = RK_MPI_MB_ReleaseMB(blocks[bi]);
         if (ret != RK_SUCCESS)
         {
             errno = ret;
             perror("mpi memory release block error");
             continue;
         }
+
+        // release block plane 1
+        bi += 1;
+        ret = RK_MPI_MB_ReleaseMB(blocks[bi]);
+        if (ret != RK_SUCCESS)
+        {
+            errno = ret;
+            perror("mpi memory release block error");
+            continue;
+        }
+
         printf("mpi memory release block ok\n");
     }
 
@@ -390,14 +430,14 @@ int free_buffers(unsigned int buffer_count, void *blocks[])
 int input(int32_t venc_channel_id, int video_fd, uint32_t width, uint32_t height, uint32_t vir_width, uint32_t vir_height, bool is_end, int32_t timeout)
 {
     struct v4l2_buffer buf;
-    struct v4l2_plane plane;
+    struct v4l2_plane planes[PLANES];
 
     memset(&buf, 0, sizeof(buf));
-    memset(&plane, 0, sizeof(plane));
+    memset(&planes, 0, sizeof(planes));
     buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
     buf.memory = V4L2_MEMORY_DMABUF;
     buf.length = 1;
-    buf.m.planes = &plane;
+    buf.m.planes = &planes;
 
     int32_t ret = ioctl(video_fd, VIDIOC_DQBUF, &buf);
     if (ret == -1)
@@ -407,7 +447,8 @@ int input(int32_t venc_channel_id, int video_fd, uint32_t width, uint32_t height
     }
     // printf("video device dequeue buffer %d %d %d ok\n", buf.index, buf.sequence, plane.bytesused);
 
-    MB_BLK block = RK_MPI_MMZ_Fd2Handle(plane.m.fd);
+    // get block plane 0
+    MB_BLK block = RK_MPI_MMZ_Fd2Handle(planes[0].m.fd);
     // check block
     if (block == RK_NULL)
     {
@@ -415,6 +456,22 @@ int input(int32_t venc_channel_id, int video_fd, uint32_t width, uint32_t height
         perror("null block");
         return -1;
     }
+
+    // get virture address plane 0
+    void *va0 = RK_MPI_MB_Handle2VirAddr(block);
+
+    // get block plane 1
+    block = RK_MPI_MMZ_Fd2Handle(planes[1].m.fd);
+    // check block
+    if (block == RK_NULL)
+    {
+        errno = -1;
+        perror("null block");
+        return -1;
+    }
+
+    // get virture address plane 1
+    void *va1 = RK_MPI_MB_Handle2VirAddr(block);
 
     // there is no need to flush cache, but i do not know why
     // in `test_mpi_venc.cpp`, they have this step
@@ -429,12 +486,13 @@ int input(int32_t venc_channel_id, int video_fd, uint32_t width, uint32_t height
 
     VIDEO_FRAME_INFO_S frame;
     memset(&frame, 0, sizeof(VIDEO_FRAME_INFO_S));
-    frame.stVFrame.pMbBlk = block;
     frame.stVFrame.u32Width = width;
     frame.stVFrame.u32Height = height;
     frame.stVFrame.u32VirWidth = width;
     frame.stVFrame.u32VirHeight = height;
     frame.stVFrame.enPixelFormat = RK_FMT_YUV420SP;
+    frame.stVFrame.pVirAddr[RK_COLOR_YUV_Y_PLANE] = va0;
+    frame.stVFrame.pVirAddr[RK_COLOR_YUV_UV_PLANE] = va1;
 
     frame.stVFrame.u32TimeRef = buf.sequence;
     frame.stVFrame.u64PTS = time_to_us(buf.timestamp);
