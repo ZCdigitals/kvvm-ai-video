@@ -4,13 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include <linux/videodev2.h>
-
 #include "rk_comm_video.h"
 #include "rk_mpi_venc.h"
-
-#define RK_COLOR RK_FMT_YUV420SP
-#define V4L2_COLOR V4L2_PIX_FMT_NV12
 
 /**
  * calculate venc size

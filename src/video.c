@@ -6,6 +6,8 @@
 
 #include <sys/ioctl.h>
 
+#include <linux/videodev2.h>
+
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -27,7 +29,7 @@ int calculate_venc(uint32_t width, uint32_t height, MB_PIC_CAL_S *mb_pic_cal)
     memset(mb_pic_cal, 0, sizeof(MB_PIC_CAL_S));
     pic_buf_attr.u32Width = width;
     pic_buf_attr.u32Height = height;
-    pic_buf_attr.enPixelFormat = RK_COLOR;
+    pic_buf_attr.enPixelFormat = RK_FMT_YUV420SP;
 
     int32_t ret = RK_MPI_CAL_COMM_GetPicBufferSize(&pic_buf_attr, mb_pic_cal);
     if (ret == -1)
@@ -57,14 +59,14 @@ int init_venc(int32_t channel_id, uint32_t width, uint32_t height, uint32_t bit_
 
     // set h264
     venc_attr.stVencAttr.enType = RK_VIDEO_ID_AVC; // 8 h264 9 mjpeg 12 h265 15 jpeg
-    venc_attr.stVencAttr.enPixelFormat = RK_COLOR;
+    venc_attr.stVencAttr.enPixelFormat = RK_FMT_YUV420SP;
     venc_attr.stVencAttr.u32Profile = H264E_PROFILE_MAIN;
     venc_attr.stVencAttr.u32PicWidth = width;
     venc_attr.stVencAttr.u32PicHeight = height;
     venc_attr.stVencAttr.u32VirWidth = width;
     venc_attr.stVencAttr.u32VirHeight = height;
     venc_attr.stVencAttr.u32StreamBufCnt = buffer_count;
-    venc_attr.stVencAttr.u32BufSize = calculate_pic_byte_size(width, height, V4L2_COLOR);
+    venc_attr.stVencAttr.u32BufSize = calculate_pic_byte_size(width, height, V4L2_PIX_FMT_NV12);
 
     // set h264 struct props
     venc_attr.stRcAttr.enRcMode = VENC_RC_MODE_H264CBR;
@@ -215,7 +217,7 @@ int init_v4l2(const char *path, unsigned int width, unsigned int height)
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
     fmt.fmt.pix_mp.width = width;
     fmt.fmt.pix_mp.height = height;
-    fmt.fmt.pix_mp.pixelformat = V4L2_COLOR;
+    fmt.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12;
     fmt.fmt.pix_mp.field = V4L2_FIELD_ANY;
     // fmt.fmt.pix_mp.num_planes = 1;
 
@@ -432,7 +434,7 @@ int input(int32_t venc_channel_id, int video_fd, uint32_t width, uint32_t height
     frame.stVFrame.u32Height = height;
     frame.stVFrame.u32VirWidth = width;
     frame.stVFrame.u32VirHeight = height;
-    frame.stVFrame.enPixelFormat = RK_COLOR;
+    frame.stVFrame.enPixelFormat = RK_FMT_YUV420SP;
 
     frame.stVFrame.u32TimeRef = buf.sequence;
     frame.stVFrame.u64PTS = time_to_us(buf.timestamp);
